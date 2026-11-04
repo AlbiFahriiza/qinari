@@ -1,0 +1,18 @@
+[package]
+name = "qinari-cli"
+description = "Qinari CLI: procedural audio maker and AI TTS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "qinari"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }

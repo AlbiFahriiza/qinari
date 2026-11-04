@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/qinari-dsp",
+    "crates/qinari-audio",
+    "crates/qinari-sfx",
+    "crates/qinari-music",
+    "crates/qinari-tts",
+    "crates/qinari-cli",
+]
+
+[workspace.package]
+version = "0.0.5-alpha"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/AlbiFahriiza/qinari"
+rust-version = "1.85"
+
+[workspace.dependencies]
+thiserror = "2.0.21"
+strsim = "0.11.1"
+sha2 = "0.11.1"
+toml = "1.2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+criterion = { version = "0.8.2", features = ["cargo_bench_support"] }
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+module_name_repetitions = "allow"
+# Publication-verbatim constants (Kellet approximations, RBJ cookbook):
+must_use_candidate = "allow"

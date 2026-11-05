@@ -2,10 +2,13 @@
 
 STATUS BOARD (updated at each checkpoint):
 - M0 docs ✓ 9fb6724 | M1 scaffold ✓ 72b707d | M2 dsp ✓ 3de49b5
-  (112 tests) | M3 audio ✓ ae24cf2 (31 tests; both mp3 segfault fixes
-  regression-proven) — ALL PUSHED to origin/main.
-- NEXT: M4 sfx, M5 music, M6 tts, M7 cli, M8 release assets,
-  verification phase, GOALS evidence, tag v0.0.5-alpha.
+  (112 tests) | M3 audio ✓ ae24cf2 (31 tests) | M4 sfx + M5 music +
+  M6 tts ✓ 02956a8 — recovered from the rolled-back sandbox and
+  gate-verified on the rebuild machine: 224 tests / 0 failed /
+  4 ignored (live TTS, need installed voices), clippy -D warnings
+  clean, fmt clean. ALL PUSHED to origin/main.
+- NEXT: M7 cli, M8 release assets, verification phase, GOALS
+  evidence, tag v0.0.5-alpha.
 - Delegation pattern that works: agents MUST read Panoptes skill fully
   + BUILD-PLAN.md section, then write+gate; subagent Task prompts must
   stay SHORT (point at files, not inline specs). Long prompts or 3

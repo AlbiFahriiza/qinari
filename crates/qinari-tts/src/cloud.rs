@@ -311,15 +311,13 @@ mod tests {
         let log: Arc<Mutex<Vec<Recorded>>> = Arc::new(Mutex::new(Vec::new()));
         let log_for_accept = Arc::clone(&log);
         std::thread::spawn(move || {
-            let mut next = 0_usize;
-            for stream in listener.incoming() {
+            for (next, stream) in listener.incoming().enumerate() {
                 let Ok(mut stream) = stream else { break };
                 let response = responses
                     .get(next)
                     .or_else(|| responses.last())
                     .expect("at least one scripted response")
                     .clone();
-                next += 1;
                 let log_for_conn = Arc::clone(&log_for_accept);
                 std::thread::spawn(move || handle_connection(&mut stream, response, &log_for_conn));
             }
@@ -334,7 +332,7 @@ mod tests {
     ) {
         if let Some(recorded) = read_request(stream) {
             log.lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .push(recorded);
         }
         match response {
@@ -367,14 +365,13 @@ mod tests {
         let mut byte = [0_u8; 1];
         loop {
             match stream.read(&mut byte) {
-                Ok(0) => return None,
+                Ok(0) | Err(_) => return None,
                 Ok(_) => {
                     head.push(byte[0]);
                     if head.ends_with(b"\r\n\r\n") {
                         break;
                     }
                 }
-                Err(_) => return None,
             }
         }
         let head = String::from_utf8_lossy(&head);

@@ -7,7 +7,7 @@
 //! - [`local::LocalVitsEngine`] runs Piper-class VITS voices through ONNX
 //!   Runtime (`ort`), phonemized offline by the pure-Rust eSpeak NG port;
 //!   both bundled voices produce 22 050 Hz mono audio.
-//! - [`cloud::OpenAiCompatibleEngine`] speaks the OpenAI
+//! - [`cloud::OpenAiCompatibleEngine`] speaks the `OpenAI`
 //!   `POST /audio/speech` protocol, so any compatible service works.
 //!
 //! Both engines expand numbers first ([`textnorm::expand_numbers`]) and

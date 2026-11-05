@@ -109,11 +109,13 @@ mod tests {
         assert_eq!(all.len(), 2);
         for voice in all {
             assert_eq!(voice.sample_rate, 22_050);
-            assert!(voice.url.ends_with(".onnx"));
+            assert!(std::path::Path::new(voice.url)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("onnx")));
             assert!(voice.config_url.ends_with(".onnx.json"));
             assert_eq!(voice.sha256.len(), 64);
             assert!(voice.sha256.chars().all(|c| c.is_ascii_hexdigit()));
-            assert!(!voice.license.is_empty());
+            assert_ne!(voice.license, "");
         }
         let en = find_voice("en_US-libritts-high").expect("en voice");
         assert_eq!(en.language, "en");

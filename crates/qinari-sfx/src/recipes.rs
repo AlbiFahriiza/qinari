@@ -259,7 +259,6 @@ fn crush_in_place(bus: &mut Bus, bits: f32) {
     }
 }
 
-
 static RAIN_PARAMS: &[ParamSpec] = &[
     spec!(
         intensity,
@@ -658,7 +657,6 @@ fn render_crickets(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     Ok(out)
 }
 
-
 static EXPLOSION_PARAMS: &[ParamSpec] = &[
     spec!(
         size,
@@ -984,7 +982,6 @@ fn render_sub_drop(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     Ok(out)
 }
 
-
 static LASER_PARAMS: &[ParamSpec] = &[];
 
 fn render_laser(ctx: &RenderContext) -> Result<AudioBuffer, String> {
@@ -1277,7 +1274,6 @@ fn render_ui_click(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     fade_edges(&mut out, ctx.sr, 0.0, 6.0);
     Ok(out)
 }
-
 
 static ALARM_PARAMS: &[ParamSpec] = &[spec!(
     speed,
@@ -1727,7 +1723,6 @@ fn render_footsteps(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     fade_edges(&mut out, ctx.sr, 80.0, 80.0);
     Ok(out)
 }
-
 
 static RECIPES: [Recipe; 29] = [
     Recipe {

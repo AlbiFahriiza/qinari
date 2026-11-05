@@ -178,7 +178,7 @@ impl LocalVitsEngine {
         let mut session = self
             .session
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let count = ids.len();
         let input = Tensor::<i64>::from_array(([1usize, count], ids.to_vec()))?;
@@ -365,7 +365,7 @@ mod tests {
         let ipa = espeak
             .text_to_phonemes_phonemizer("Selamat pagi.")
             .expect("id phonemes");
-        assert!(!ipa.is_empty());
+        assert_ne!(ipa, "");
         ensure_espeak_data(&dir, &[Language::En, Language::Id]).expect("second install");
     }
 }

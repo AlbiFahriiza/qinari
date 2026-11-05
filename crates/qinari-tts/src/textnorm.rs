@@ -211,23 +211,20 @@ fn split_token(token: &str, language: Language) -> Option<(String, Option<String
     let digits_only = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
     let thousands = language.thousands_sep();
     let groups: Vec<&str> = int_part.split(thousands).collect();
-    match groups.len() {
+    if groups.len() == 1 {
         // A single group is a plain integer: any number of digits.
-        1 => {
-            if !digits_only(groups[0]) {
-                return None;
-            }
+        if !digits_only(groups[0]) {
+            return None;
         }
+    } else {
         // With thousands separators, the first group is 1-3 digits and every
         // later group exactly three.
-        _ => {
-            if groups[0].is_empty() || groups[0].len() > 3 || !digits_only(groups[0]) {
+        if groups[0].is_empty() || groups[0].len() > 3 || !digits_only(groups[0]) {
+            return None;
+        }
+        for group in &groups[1..] {
+            if group.len() != 3 || !digits_only(group) {
                 return None;
-            }
-            for group in &groups[1..] {
-                if group.len() != 3 || !digits_only(group) {
-                    return None;
-                }
             }
         }
     }
@@ -563,7 +560,7 @@ mod tests {
     #[test]
     fn chunking_short_text_is_one_piece() {
         assert_eq!(chunk_text("Hello there.", 3000), vec!["Hello there."]);
-        assert!(chunk_text("   ", 3000).is_empty());
+        assert_eq!(chunk_text("   ", 3000).len(), 0);
     }
 
     #[test]

@@ -7,8 +7,12 @@ STATUS BOARD (updated at each checkpoint):
   gate-verified on the rebuild machine: 224 tests / 0 failed /
   4 ignored (live TTS, need installed voices), clippy -D warnings
   clean, fmt clean. ALL PUSHED to origin/main.
-- NEXT: M7 cli, M8 release assets, verification phase, GOALS
-  evidence, tag v0.0.5-alpha.
+- NEXT: M8 release assets, verification phase, GOALS evidence, tag
+  v0.0.5-alpha.
+- M7 cli ✓: workspace now 294 tests / 0 failed / 4 ignored (live TTS);
+  clippy -D warnings + fmt clean; black-box smoke verified (exit codes
+  0/2/6/7/8, byte-identical determinism, negative --target-lufs,
+  batch out-NNN, listings, doctor on empty HOME).
 - Delegation pattern that works: agents MUST read Panoptes skill fully
   + BUILD-PLAN.md section, then write+gate; subagent Task prompts must
   stay SHORT (point at files, not inline specs). Long prompts or 3

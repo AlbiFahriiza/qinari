@@ -15,4 +15,25 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
+qinari-audio = { version = "0.0.5-alpha", path = "../qinari-audio" }
+qinari-sfx = { version = "0.0.5-alpha", path = "../qinari-sfx" }
+qinari-music = { version = "0.0.5-alpha", path = "../qinari-music" }
+qinari-tts = { version = "0.0.5-alpha", path = "../qinari-tts" }
 thiserror = { workspace = true }
+strsim = { workspace = true }
+sha2 = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+dialoguer = { workspace = true }
+directories = { workspace = true }
+indicatif = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }

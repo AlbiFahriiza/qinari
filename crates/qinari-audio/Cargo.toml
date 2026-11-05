@@ -11,4 +11,13 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
+hound = "3.5.1"
+mp3lame-encoder = "0.3.0"
+rubato = "5.0.1"
+symphonia = { version = "0.6.1", default-features = false, features = [
+    "wav",
+    "mp3",
+    "pcm",
+] }
 thiserror = { workspace = true }

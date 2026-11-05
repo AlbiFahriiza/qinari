@@ -1,6 +1,6 @@
 //! Noise generators and noise-based sound sources.
 
-use crate::filter::{Biquad, BiquadKind};
+use crate::filter::{Biquad, BiquadKind, Svf};
 use crate::rng::Qrng;
 
 /// Spectral character of a [`NoiseGen`].
@@ -51,17 +51,23 @@ impl NoiseGen {
         match self.kind {
             NoiseKind::White => white,
             NoiseKind::Pink => {
-                // Paul Kellet's economical pink filter, scaled to keep the
+                // Economical pink filter from Paul Kellet, scaled to keep the
                 // output within about +/-1.
-                self.b0 = 0.99886 * self.b0 + white * 0.0555179;
-                self.b1 = 0.99332 * self.b1 + white * 0.0750759;
-                self.b2 = 0.96900 * self.b2 + white * 0.1538520;
-                self.b3 = 0.86650 * self.b3 + white * 0.3104856;
-                self.b4 = 0.55000 * self.b4 + white * 0.5329522;
-                self.b5 = -0.7616 * self.b5 - white * 0.0168980;
-                let sum = self.b0 + self.b1 + self.b2 + self.b3 + self.b4 + self.b5 + self.b6
+                self.b0 = 0.99886 * self.b0 + white * 0.055_517_9;
+                self.b1 = 0.99332 * self.b1 + white * 0.075_075_9;
+                self.b2 = 0.96900 * self.b2 + white * 0.153_852;
+                self.b3 = 0.86650 * self.b3 + white * 0.310_485_6;
+                self.b4 = 0.55000 * self.b4 + white * 0.532_952_2;
+                self.b5 = -0.7616 * self.b5 - white * 0.016_898;
+                let sum = self.b0
+                    + self.b1
+                    + self.b2
+                    + self.b3
+                    + self.b4
+                    + self.b5
+                    + self.b6
                     + white * 0.5362;
-                self.b6 = white * 0.115926;
+                self.b6 = white * 0.115_926;
                 sum * 0.25
             }
         }
@@ -92,22 +98,23 @@ fn peak_normalize_to(samples: &mut [f32], target: f32) {
 /// on that normalization for predictable levels.
 ///
 /// Returns an empty vector if `decay_secs` is not positive.
-pub fn noise_burst(
-    sample_rate: f32,
-    rng: &mut Qrng,
-    cutoff_hz: f32,
-    decay_secs: f32,
-) -> Vec<f32> {
+pub fn noise_burst(sample_rate: f32, rng: &mut Qrng, cutoff_hz: f32, decay_secs: f32) -> Vec<f32> {
     if decay_secs <= 0.0 || sample_rate <= 0.0 {
         return Vec::new();
     }
     let total = (8.0 * decay_secs * sample_rate).ceil() as usize;
     let tau_samples = decay_secs * sample_rate;
-    let mut filter = Biquad::design(BiquadKind::Lowpass, sample_rate, cutoff_hz, 0.7071, 0.0);
+    let mut filter = Biquad::design(
+        BiquadKind::Lowpass,
+        sample_rate,
+        cutoff_hz,
+        std::f32::consts::FRAC_1_SQRT_2,
+        0.0,
+    );
     let mut out = Vec::with_capacity(total);
     for n in 0..total {
         let white = rng.next_f32() * 2.0 - 1.0;
-        let enveloped = filter.process(white) * (-n as f32 / tau_samples).exp();
+        let enveloped = filter.process(white) * (-(n as f32) / tau_samples).exp();
         out.push(enveloped);
     }
     peak_normalize_to(&mut out, 0.7);
@@ -117,8 +124,10 @@ pub fn noise_burst(
 /// Renders noise through a bandpass sweeping from `start_hz` to `end_hz`
 /// (linear in Hz), peak-normalized to 0.7.
 ///
-/// The filter is retuned every sample (state preserved) so the sweep is
-/// continuous; `q` controls the resonance.
+/// The filter is a TPT state-variable filter whose centre is retuned every
+/// sample while its state is preserved (see [`Svf::set`]), so the sweep is
+/// continuous and the resonance tracks the moving centre; `q` controls the
+/// resonance.
 pub fn swept_noise(
     sample_rate: f32,
     rng: &mut Qrng,
@@ -131,14 +140,14 @@ pub fn swept_noise(
         return Vec::new();
     }
     let total = (secs * sample_rate).round() as usize;
-    let mut filter = Biquad::design(BiquadKind::Bandpass, sample_rate, start_hz, q, 0.0);
+    let mut filter = Svf::new(sample_rate, start_hz, q);
     let mut out = Vec::with_capacity(total);
     for n in 0..total {
         let t = n as f32 / total as f32;
         let f0 = start_hz + (end_hz - start_hz) * t;
-        filter = Biquad::design(BiquadKind::Bandpass, sample_rate, f0, q, 0.0);
+        filter.set(sample_rate, f0, q);
         let white = rng.next_f32() * 2.0 - 1.0;
-        out.push(filter.process(white));
+        out.push(filter.process(white).band);
     }
     peak_normalize_to(&mut out, 0.7);
     out
@@ -158,14 +167,11 @@ mod tests {
         assert!(samples.iter().all(|s| s.is_finite()));
         let peak = samples.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
         assert!(peak <= 1.0);
-        let mean_square = samples.iter().map(|&s| f64::from(s * s)).sum::<f64>()
-            / samples.len() as f64;
+        let mean_square =
+            samples.iter().map(|&s| f64::from(s * s)).sum::<f64>() / samples.len() as f64;
         let rms = mean_square.sqrt() as f32;
         // Uniform [-1, 1] has RMS 1/sqrt(3) = 0.5774.
-        assert!(
-            (rms - 0.5774).abs() < 0.02,
-            "rms {rms}, expected ~0.5774"
-        );
+        assert!((rms - 0.5774).abs() < 0.02, "rms {rms}, expected ~0.5774");
     }
 
     #[test]
@@ -205,7 +211,8 @@ mod tests {
     fn noise_burst_peaks_at_target_and_decays() {
         let mut rng = Qrng::new(77);
         let burst = noise_burst(SR, &mut rng, 2000.0, 0.25);
-        assert!(!burst.is_empty());
+        // 8 * decay_secs * sr, per the render-length contract in the docs.
+        assert_eq!(burst.len(), 96_000);
         assert!(burst.iter().all(|s| s.is_finite()));
         let peak = burst.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
         assert!((peak - 0.7).abs() < 0.01, "peak {peak}");
@@ -224,7 +231,33 @@ mod tests {
         );
 
         // Degenerate parameter returns empty output.
-        assert!(noise_burst(SR, &mut rng, 1000.0, 0.0).is_empty());
+        assert_eq!(noise_burst(SR, &mut rng, 1000.0, 0.0), [] as [f32; 0]);
+    }
+
+    #[test]
+    fn swept_noise_follows_the_sweep_centers() {
+        // The resonance must track the moving centre: energy measured at the
+        // end of the sweep must sit near the end frequency, not near the start.
+        let mut rng = Qrng::new(88);
+        let sweep = swept_noise(SR, &mut rng, 200.0, 3000.0, 1.0, 4.0);
+        let n = sweep.len();
+        let last_quarter = &sweep[3 * n / 4..];
+        let first_quarter = &sweep[..n / 4];
+        let power_at = |slice: &[f32], freq: f32| goertzel_power(slice, freq, SR);
+        // Near the end (2250-3000 Hz centre) the tail holds much more energy
+        // at 2600 Hz than the head does, and vice versa at 350 Hz.
+        let tail_high = power_at(last_quarter, 2600.0);
+        let head_high = power_at(first_quarter, 2600.0);
+        assert!(
+            tail_high > 4.0 * head_high,
+            "2600 Hz: tail {tail_high} vs head {head_high}"
+        );
+        let tail_low = power_at(last_quarter, 350.0);
+        let head_low = power_at(first_quarter, 350.0);
+        assert!(
+            head_low > 4.0 * tail_low,
+            "350 Hz: head {head_low} vs tail {tail_low}"
+        );
     }
 
     #[test]
@@ -235,9 +268,8 @@ mod tests {
         assert!(sweep.iter().all(|s| s.is_finite()));
         let peak = sweep.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
         assert!((peak - 0.7).abs() < 0.01, "peak {peak}");
-        let rms = (sweep.iter().map(|&s| f64::from(s * s)).sum::<f64>()
-            / sweep.len() as f64)
-            .sqrt();
+        let rms =
+            (sweep.iter().map(|&s| f64::from(s * s)).sum::<f64>() / sweep.len() as f64).sqrt();
         assert!(rms > 0.01, "rms {rms}");
         assert!(sweep.iter().fold(0.0f32, |m, &s| m.max(s.abs())) <= 0.71);
     }

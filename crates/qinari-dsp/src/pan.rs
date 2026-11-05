@@ -7,8 +7,9 @@
 /// side and the total power stays roughly constant while moving.
 pub fn pan(x: f32, pos: f32) -> (f32, f32) {
     let pos = pos.clamp(-1.0, 1.0);
+    // 0.5 * (1 -/+ pos) written as a midpoint: equal-power gains.
     let left_gain = (0.5 * (1.0 - pos)).sqrt();
-    let right_gain = (0.5 * (1.0 + pos)).sqrt();
+    let right_gain = (1.0_f32.midpoint(pos)).sqrt();
     (x * left_gain, x * right_gain)
 }
 
@@ -36,7 +37,7 @@ impl Panner {
     pub fn set_pos(&mut self, pos: f32) {
         self.pos = pos.clamp(-1.0, 1.0);
         self.left_gain = (0.5 * (1.0 - self.pos)).sqrt();
-        self.right_gain = (0.5 * (1.0 + self.pos)).sqrt();
+        self.right_gain = (1.0_f32.midpoint(self.pos)).sqrt();
     }
 
     /// Returns the current position in `[-1, 1]`.

@@ -95,7 +95,11 @@ impl Qrng {
 
     /// Returns the next raw 64-bit value.
     pub fn next_u64(&mut self) -> u64 {
-        let result = self.s0.wrapping_add(self.s3).rotate_left(23).wrapping_add(self.s0);
+        let result = self
+            .s0
+            .wrapping_add(self.s3)
+            .rotate_left(23)
+            .wrapping_add(self.s0);
         let t = self.s1 << 17;
         self.s2 ^= self.s0;
         self.s3 ^= self.s1;
@@ -133,7 +137,10 @@ impl Qrng {
     ///
     /// Panics if `lo > hi`.
     pub fn next_int_range(&mut self, lo: u64, hi: u64) -> u64 {
-        assert!(lo <= hi, "next_int_range requires lo <= hi (got {lo} > {hi})");
+        assert!(
+            lo <= hi,
+            "next_int_range requires lo <= hi (got {lo} > {hi})"
+        );
         let span = hi.wrapping_sub(lo).wrapping_add(1);
         if span == 0 {
             return self.next_u64();
@@ -146,6 +153,7 @@ impl Qrng {
     /// The child seed mixes a fork counter with the parent's current state,
     /// so repeated forks differ, and the child keeps its own state: advancing
     /// the parent afterwards never changes the child's sequence.
+    #[must_use]
     pub fn fork(&mut self) -> Self {
         self.fork_counter += 1;
         let mixed = self
@@ -153,7 +161,9 @@ impl Qrng {
             .wrapping_mul(0x9e37_79b9_7f4a_7c15)
             .wrapping_add(self.fork_counter)
             ^ self.next_u64();
-        Self::new(splitmix64(&mut (mixed.wrapping_add(self.fork_counter.rotate_left(32)))))
+        Self::new(splitmix64(
+            &mut (mixed.wrapping_add(self.fork_counter.rotate_left(32))),
+        ))
     }
 }
 
@@ -178,20 +188,20 @@ mod tests {
 
     #[test]
     fn same_seed_same_sequence() {
-        let mut a = Qrng::new(1234);
-        let mut b = Qrng::new(1234);
-        let mut c = Qrng::new(1235);
-        let sa: Vec<u64> = (0..64).map(|_| a.next_u64()).collect();
-        let sb: Vec<u64> = (0..64).map(|_| b.next_u64()).collect();
-        let sc: Vec<u64> = (0..64).map(|_| c.next_u64()).collect();
-        assert_eq!(sa, sb);
-        assert_ne!(sa, sc);
+        let mut left = Qrng::new(1234);
+        let mut right = Qrng::new(1234);
+        let mut other = Qrng::new(1235);
+        let seq_left: Vec<u64> = (0..64).map(|_| left.next_u64()).collect();
+        let seq_right: Vec<u64> = (0..64).map(|_| right.next_u64()).collect();
+        let seq_other: Vec<u64> = (0..64).map(|_| other.next_u64()).collect();
+        assert_eq!(seq_left, seq_right);
+        assert_ne!(seq_left, seq_other);
 
-        let mut d = Qrng::new(1234);
-        let sf: Vec<f32> = (0..64).map(|_| d.next_f32()).collect();
-        let mut e = Qrng::new(1234);
-        for expected in sf {
-            assert_eq!(e.next_f32(), expected);
+        let mut floats = Qrng::new(1234);
+        let seq_floats: Vec<f32> = (0..64).map(|_| floats.next_f32()).collect();
+        let mut replay = Qrng::new(1234);
+        for expected in seq_floats {
+            assert_eq!(replay.next_f32(), expected);
         }
     }
 
@@ -240,22 +250,82 @@ mod tests {
             assert!((3..=7).contains(&v));
             seen[(v - 3) as usize] = true;
         }
-        assert!(seen.iter().all(|&s| s), "not every value in [3, 7] was drawn");
+        assert!(
+            seen.iter().all(|&s| s),
+            "not every value in [3, 7] was drawn"
+        );
         for _ in 0..10 {
             assert_eq!(rng.next_int_range(5, 5), 5);
         }
     }
 
     #[test]
+    fn matches_reference_xoshiro256_plus_plus_vectors() {
+        // Golden values produced independently from the published
+        // splitmix64-seeded xoshiro256++ reference (prng.di.unimi.it).
+        let mut rng = Qrng::new(42);
+        assert_eq!(rng.next_u64(), 0xd076_4d4f_4476_689f);
+        assert_eq!(rng.next_u64(), 0x519e_4174_576f_3791);
+        assert_eq!(rng.next_u64(), 0xfbe0_7cfb_0c24_ed8c);
+        assert_eq!(rng.next_u64(), 0xb37d_9f60_0cd8_35b8);
+
+        let mut rng = Qrng::new(42);
+        let floats: Vec<f32> = (0..4).map(|_| rng.next_f32()).collect();
+        let expected = [0.814_305_1_f32, 0.318_821, 0.983_894_1, 0.701_135_6];
+        for (got, want) in floats.iter().zip(expected) {
+            assert!((got - want).abs() < 1.0e-6, "got {got}, want {want}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "next_range requires lo < hi")]
+    fn next_range_panics_on_empty_range() {
+        Qrng::new(1).next_range(2.0, 2.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "next_int_range requires lo <= hi")]
+    fn next_int_range_panics_on_reversed_bounds() {
+        Qrng::new(1).next_int_range(5, 3);
+    }
+
+    #[test]
+    fn next_int_range_covers_the_full_u64_span() {
+        let mut rng = Qrng::new(19);
+        let mut previous = rng.next_int_range(0, u64::MAX);
+        let mut changed = 0;
+        for _ in 0..100 {
+            let value = rng.next_int_range(0, u64::MAX);
+            if value != previous {
+                changed += 1;
+            }
+            previous = value;
+        }
+        assert!(changed > 90, "only {changed} of 100 draws differed");
+    }
+
+    #[test]
+    fn fork_children_track_the_parent_seed() {
+        let mut parent_one = Qrng::new(1_000);
+        let mut parent_two = Qrng::new(1_000);
+        let first: Vec<u64> = (0..8).map(|_| parent_one.fork().next_u64()).collect();
+        let second: Vec<u64> = (0..8).map(|_| parent_two.fork().next_u64()).collect();
+        assert_eq!(first, second);
+
+        let mut parent_three = Qrng::new(2_000);
+        let third: Vec<u64> = (0..8).map(|_| parent_three.fork().next_u64()).collect();
+        assert_ne!(first, third);
+    }
+
+    #[test]
     fn fork_is_deterministic_and_independent() {
         let mut a = Qrng::new(100);
-        let child_a = a.fork();
-        let seq_a: Vec<u64> = (0..16).map(|_| child_a.clone().next_u64()).collect();
-
+        let mut child_a = a.fork();
+        let seq_a: Vec<u64> = (0..16).map(|_| child_a.next_u64()).collect();
         let mut b = Qrng::new(100);
         let mut child_b = b.fork();
-        for i in 0..16 {
-            assert_eq!(child_b.next_u64(), seq_a[i]);
+        for expected in &seq_a {
+            assert_eq!(child_b.next_u64(), *expected);
         }
 
         // Advancing the parent after the fork must not change the child.
@@ -264,8 +334,8 @@ mod tests {
         for _ in 0..1_000 {
             c.next_u64();
         }
-        for i in 0..16 {
-            assert_eq!(child_c.next_u64(), seq_a[i]);
+        for expected in &seq_a {
+            assert_eq!(child_c.next_u64(), *expected);
         }
 
         // Children differ from the parent's own continuation and from each other.

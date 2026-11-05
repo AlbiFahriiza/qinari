@@ -1,0 +1,119 @@
+{
+  "entries": {
+    "090e994dfe45bf78": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:22:16+00:00",
+      "last_seen": "2026-11-05T00:22:21+00:00",
+      "norm_message": "no coverage report could be parsed; run the project's coverage command and pass --report/--command, or set coverage.command in disciplined.yaml",
+      "path": "",
+      "rule": "COVERAGE-NO-DATA",
+      "severity": "WARN"
+    },
+    "12f71d5078fdfab0": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; process(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-dsp/src/noise.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "BLOCK"
+    },
+    "682ff1d73fcdeffe": {
+      "acked": false,
+      "count": 5,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:23:06+00:00",
+      "norm_message": "# files and # changed lines; confirm every hunk is needed for the request",
+      "path": "crates/qinari-dsp/src/analysis.rs",
+      "rule": "SCOPE-LARGE",
+      "severity": "LOCK"
+    },
+    "69721a966cca8994": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-dsp/src/lufs.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "BLOCK"
+    },
+    "698a4ec856269423": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:22:16+00:00",
+      "last_seen": "2026-11-05T00:22:21+00:00",
+      "norm_message": "no arch.layers configured in disciplined.yaml; declare ui/services/domain/shared (docs/CONFIG.md)",
+      "path": "",
+      "rule": "ARCH-NO-PLAN",
+      "severity": "BLOCK"
+    },
+    "971c118beb7f56aa": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-dsp/src/osc.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "BLOCK"
+    },
+    "ae7b26d550e1d9a8": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; square_has_strong_fundamental_and_suppressed_aliases(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-dsp/src/osc.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "BLOCK"
+    },
+    "d308924a50ca2245": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-dsp/src/noise.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "BLOCK"
+    },
+    "e651f7aead75a93c": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; anchor_#hz_stereo_l_r_reads_minus_#_lufs(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-dsp/src/lufs.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "BLOCK"
+    },
+    "f4bfd7e8af19862d": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-05T00:05:00+00:00",
+      "last_seen": "2026-11-05T00:12:58+00:00",
+      "norm_message": "commented-out code; version control remembers it",
+      "path": "crates/qinari-dsp/src/lufs.rs",
+      "rule": "COMMENTED-CODE",
+      "severity": "BLOCK"
+    }
+  },
+  "runs": {
+    "arch_gate": {
+      "count": 2,
+      "last": "2026-11-05T00:22:21+00:00"
+    },
+    "check_diff": {
+      "count": 5,
+      "last": "2026-11-05T00:23:06+00:00"
+    },
+    "coverage_gate": {
+      "count": 2,
+      "last": "2026-11-05T00:22:21+00:00"
+    }
+  },
+  "version": 2
+}

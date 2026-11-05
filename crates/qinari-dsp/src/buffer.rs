@@ -68,10 +68,7 @@ impl AudioBuffer {
     /// Returns [`BufferError::RaggedChannels`] if the channels have
     /// differing lengths, and [`BufferError::InvalidSampleRate`] if the
     /// sample rate is zero.
-    pub fn from_channels(
-        channels: Vec<Vec<f32>>,
-        sample_rate: u32,
-    ) -> Result<Self, BufferError> {
+    pub fn from_channels(channels: Vec<Vec<f32>>, sample_rate: u32) -> Result<Self, BufferError> {
         if sample_rate == 0 {
             return Err(BufferError::InvalidSampleRate { rate: 0 });
         }
@@ -186,7 +183,7 @@ impl AudioBuffer {
     /// Applies `f` to each `(left, right)` pair of the first two channels.
     ///
     /// Buffers with fewer than two channels are left unchanged.
-    pub fn map_stereo(&mut self, f: impl FnMut(f32, f32) -> (f32, f32)) {
+    pub fn map_stereo(&mut self, mut f: impl FnMut(f32, f32) -> (f32, f32)) {
         if self.channels.len() < 2 {
             return;
         }
@@ -387,7 +384,10 @@ mod tests {
         assert_eq!(buffer.get(0, 0), 0.0);
         assert_eq!(buffer.get(1, 0), 0.0);
         assert!((buffer.get(0, 49) - 0.7 * 49.0 / 50.0).abs() < 1e-6);
-        assert!((buffer.get(0, 50) - 0.7).abs() < 1e-6, "beyond fade untouched");
+        assert!(
+            (buffer.get(0, 50) - 0.7).abs() < 1e-6,
+            "beyond fade untouched"
+        );
         assert!((buffer.get(0, 99) - 0.7).abs() < 1e-6);
 
         let mut buffer = AudioBuffer::new(1, 100, SR);
@@ -420,11 +420,9 @@ mod tests {
 
     #[test]
     fn map_stereo_pairs_channels() {
-        let mut buffer = AudioBuffer::from_channels(
-            vec![vec![0.1; 8], vec![-0.2; 8], vec![0.5; 8]],
-            SR,
-        )
-        .unwrap();
+        let mut buffer =
+            AudioBuffer::from_channels(vec![vec![0.1; 8], vec![-0.2; 8], vec![0.5; 8]], SR)
+                .unwrap();
         buffer.map_stereo(|l, r| (r, l));
         for f in 0..8 {
             assert_eq!(buffer.get(0, f), -0.2);
@@ -444,14 +442,16 @@ mod tests {
         master.mix(&mono, 2.0);
         assert_eq!(master.frames(), 6, "mix does not change length");
         assert!((master.get(0, 0) - 2.0).abs() < 1e-6);
-        assert!((master.get(1, 0) - (-1.0 + 1.0)).abs() < 1e-6, "wrapped channel");
+        assert!(
+            (master.get(1, 0) - (-1.0 + 1.0)).abs() < 1e-6,
+            "wrapped channel"
+        );
         assert!((master.get(0, 1) - (1.0 + 0.5)).abs() < 1e-6);
         assert!((master.get(0, 3) - 1.0).abs() < 1e-6, "padded with silence");
 
         // Stereo into stereo mixes in place.
         let mut master = AudioBuffer::from_channels(vec![vec![1.0; 2], vec![1.0; 2]], SR).unwrap();
-        let stereo =
-            AudioBuffer::from_channels(vec![vec![0.1; 2], vec![0.2; 2]], SR).unwrap();
+        let stereo = AudioBuffer::from_channels(vec![vec![0.1; 2], vec![0.2; 2]], SR).unwrap();
         master.mix(&stereo, 1.0);
         assert!((master.get(0, 0) - 1.1).abs() < 1e-6);
         assert!((master.get(1, 0) - 1.2).abs() < 1e-6);
@@ -474,6 +474,68 @@ mod tests {
         assert_eq!(base.frames(), 5);
         assert!((base.get(0, 4) - 0.0).abs() < 1e-6);
         assert!((base.get(0, 0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn db_helpers_handle_zero_and_extremes() {
+        assert_eq!(linear_to_db(0.0), f32::NEG_INFINITY);
+        assert!(linear_to_db(1.0).abs() < 1.0e-6);
+        assert_eq!(db_to_linear(f32::NEG_INFINITY), 0.0);
+        assert!((db_to_linear(60.0) - 1000.0).abs() < 0.01);
+        assert!(db_to_linear(f32::INFINITY).is_infinite());
+    }
+
+    #[test]
+    fn empty_and_zero_channel_buffers_are_well_formed() {
+        let empty = AudioBuffer::new(0, 0, SR);
+        assert_eq!(empty.frames(), 0);
+        assert_eq!(empty.num_channels(), 0);
+        assert_eq!(empty.peak(), 0.0);
+        assert_eq!(empty.rms(), 0.0);
+        assert!((empty.duration() - 0.0).abs() < 1.0e-12);
+        assert!(!empty.has_non_finite());
+        assert_eq!(empty.get(0, 0), 0.0);
+
+        let no_channels = AudioBuffer::from_channels(vec![], SR).unwrap();
+        assert_eq!(no_channels.num_channels(), 0);
+        assert_eq!(no_channels.frames(), 0);
+
+        // Fades on an empty buffer must not panic or divide by zero.
+        let mut empty = AudioBuffer::new(0, 0, SR);
+        empty.fade_in(100);
+        empty.fade_out(100);
+        assert_eq!(empty.frames(), 0);
+    }
+
+    #[test]
+    fn mix_with_zero_gain_changes_nothing_and_negative_gain_subtracts() {
+        let mut base = AudioBuffer::from_channels(vec![vec![0.5; 4], vec![-0.25; 4]], SR).unwrap();
+        let layer = AudioBuffer::from_channels(vec![vec![0.125; 4]], SR).unwrap();
+        base.mix(&layer, 0.0);
+        for frame in 0..4 {
+            assert!((base.get(0, frame) - 0.5).abs() < 1.0e-7);
+            assert!((base.get(1, frame) - (-0.25)).abs() < 1.0e-7);
+        }
+        base.mix(&layer, -1.0);
+        for frame in 0..4 {
+            assert!((base.get(0, frame) - (0.5 - 0.125)).abs() < 1.0e-6);
+            assert!((base.get(1, frame) - (-0.25 - 0.125)).abs() < 1.0e-6);
+        }
+    }
+
+    #[test]
+    fn apply_gain_db_minus_infinity_silences_the_buffer() {
+        let mut buffer = AudioBuffer::from_channels(vec![vec![0.3; 8], vec![-0.9; 8]], SR).unwrap();
+        buffer.apply_gain_db(f32::NEG_INFINITY);
+        assert_eq!(buffer.peak(), 0.0);
+    }
+
+    #[test]
+    fn channels_accessor_exposes_the_planar_data() {
+        let buffer = AudioBuffer::from_channels(vec![vec![1.0, 2.0], vec![3.0, 4.0]], SR).unwrap();
+        assert_eq!(buffer.channels().len(), 2);
+        assert_eq!(buffer.channels()[0], vec![1.0, 2.0]);
+        assert_eq!(buffer.channels()[1], vec![3.0, 4.0]);
     }
 
     #[test]

@@ -168,10 +168,11 @@ mod tests {
     fn sample_hold_changes_value_once_per_cycle() {
         let mut lfo = Lfo::new(LfoShape::SampleHold, 10.0, SR, &mut Qrng::new(4));
         let samples: Vec<f32> = (0..48_000).map(|_| lfo.process()).collect();
-        // Exactly 4800 samples per hold at 48 kHz / 10 Hz.
+        // Exactly 4800 samples per hold at 48 kHz / 10 Hz. Held samples are
+        // the same f32 copied, so segment boundaries are compared by bits.
         let mut runs = 1usize;
         for pair in samples.windows(2) {
-            if pair[0] != pair[1] {
+            if pair[0].to_bits() != pair[1].to_bits() {
                 runs += 1;
             }
         }

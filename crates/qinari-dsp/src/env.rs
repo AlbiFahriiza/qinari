@@ -127,12 +127,11 @@ impl Adsr {
                         AdsrState::Decay
                     }
                 }
-                AdsrState::Decay => AdsrState::Sustain,
+                AdsrState::Decay | AdsrState::Sustain | AdsrState::Idle => AdsrState::Sustain,
                 AdsrState::Release => {
                     self.level = 0.0;
                     AdsrState::Idle
                 }
-                AdsrState::Sustain | AdsrState::Idle => AdsrState::Sustain,
             };
             self.segment_pos = 0;
         }

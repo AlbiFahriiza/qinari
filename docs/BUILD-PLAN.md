@@ -1,6 +1,22 @@
 # Qinari 0.0.5-alpha build plan (recovery)
 
-Status board — M0 ✓ M1 ✓ (pushed). Below are the specs for the remaining
+STATUS BOARD (updated at each checkpoint):
+- M0 docs ✓ 9fb6724 | M1 scaffold ✓ 72b707d | M2 dsp ✓ 3de49b5
+  (112 tests) | M3 audio ✓ ae24cf2 (31 tests; both mp3 segfault fixes
+  regression-proven) — ALL PUSHED to origin/main.
+- NEXT: M4 sfx, M5 music, M6 tts, M7 cli, M8 release assets,
+  verification phase, GOALS evidence, tag v0.0.5-alpha.
+- Delegation pattern that works: agents MUST read Panoptes skill fully
+  + BUILD-PLAN.md section, then write+gate; subagent Task prompts must
+  stay SHORT (point at files, not inline specs). Long prompts or 3
+  parallel heavy agents hit tool deadlines — run at most 1-2 heavy
+  build agents at a time.
+- Verified API surfaces for M4-M7 are in the committed code itself
+  (read crates/qinari-dsp/src/*.rs and crates/qinari-audio/src/*.rs).
+- LUFS test anchor (corrected): stereo L=R sine at -23 dBFS/channel
+  == mono -20 dBFS == -23.0 LUFS.
+- Time crate must NOT enter the tree (RUSTSEC-2026-0009 in old
+  tracing-appender path) — CLI logging writes via Arc<File> directly. Below are the specs for the remaining
 milestones, encoding every design decision and previously-solved bug fix.
 Agents: read Panoptes skill fully first (repo-external bundle), then your
 section. Build gates before reporting: fmt, clippy -D warnings, tests.

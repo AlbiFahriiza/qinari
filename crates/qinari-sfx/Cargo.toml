@@ -11,4 +11,6 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+qinari-dsp = { path = "../qinari-dsp" }
+strsim = { workspace = true }
 thiserror = { workspace = true }

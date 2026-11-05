@@ -10,6 +10,26 @@
       "rule": "COVERAGE-NO-DATA",
       "severity": "WARN"
     },
+    "0d4e7e13db1e18f6": {
+      "acked": false,
+      "count": 6,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:13:49+00:00",
+      "norm_message": "section banner comment; structure the code instead",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "COMMENT-BANNER",
+      "severity": "LOCK"
+    },
+    "121103fa0dc1c906": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-sfx/src/ambient.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
     "12f71d5078fdfab0": {
       "acked": false,
       "count": 2,
@@ -20,6 +40,106 @@
       "rule": "COMPLEXITY-FUNC-LINES",
       "severity": "BLOCK"
     },
+    "263dcd1dae50ee1b": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; id_engine(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-tts/tests/live.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "2798c95d51ea5de5": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "2da037ac8029a6d3": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "42e64c533d3097f0": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "commented-out code; version control remembers it",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMMENTED-CODE",
+      "severity": "LOCK"
+    },
+    "4664dce1c41f84f7": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "nesting depth # (max #); use early returns or extract a function",
+      "path": "crates/qinari-tts/src/textnorm.rs",
+      "rule": "COMPLEXITY-NESTING",
+      "severity": "LOCK"
+    },
+    "478bfa372d7d9f2d": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "test skipped or marked expected-failure; fix the cause or ask the user",
+      "path": "crates/qinari-tts/tests/live.rs",
+      "rule": "TEST-SKIP",
+      "severity": "LOCK"
+    },
+    "48535d56d1e0ea9b": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "section banner comment; structure the code instead",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMMENT-BANNER",
+      "severity": "LOCK"
+    },
+    "580386074c39a6ed": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "60ed2e9e5beb0720": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'espeak_ng' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registry",
+      "path": "crates/qinari-tts/src/local.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "6628b8e6222d6605": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-tts/src/textnorm.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "LOCK"
+    },
     "682ff1d73fcdeffe": {
       "acked": false,
       "count": 5,
@@ -28,6 +148,16 @@
       "norm_message": "# files and # changed lines; confirm every hunk is needed for the request",
       "path": "crates/qinari-dsp/src/analysis.rs",
       "rule": "SCOPE-LARGE",
+      "severity": "LOCK"
+    },
+    "692c04139f7d0651": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-music/src/tests.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
       "severity": "LOCK"
     },
     "69721a966cca8994": {
@@ -50,6 +180,106 @@
       "rule": "ARCH-NO-PLAN",
       "severity": "BLOCK"
     },
+    "7a97d010961847e5": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; render_layer(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-sfx/src/ambient.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "7e5f4443b15bebba": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "dependency 'qinari-dsp' added; confirm the user approved it and that the name, publisher and license were verified",
+      "path": "crates/qinari-music/Cargo.toml",
+      "rule": "DEPENDENCY-ADDED",
+      "severity": "LOCK"
+    },
+    "7f37756666e2e127": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; fmt(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-tts/src/textnorm.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "8145ca71b16e6367": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-sfx/src/lib.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "8769a570776f435a": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment narrates the assistant's work instead of the code's reason",
+      "path": "crates/qinari-tts/src/lib.rs",
+      "rule": "COMMENT-AI-PROCESS",
+      "severity": "LOCK"
+    },
+    "8c894e772cbb9c20": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "dependency 'qinari-dsp' added; confirm the user approved it and that the name, publisher and license were verified",
+      "path": "crates/qinari-tts/Cargo.toml",
+      "rule": "DEPENDENCY-ADDED",
+      "severity": "LOCK"
+    },
+    "8dc63924a640c518": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-tts/src/engine.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "90a35712df404776": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-sfx/src/ambient.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "956994ac10466568": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-tts/src/voices.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "96d6e5001e6b2952": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
     "971c118beb7f56aa": {
       "acked": false,
       "count": 2,
@@ -59,6 +289,56 @@
       "path": "crates/qinari-dsp/src/osc.rs",
       "rule": "COMMENT-RESTATES",
       "severity": "BLOCK"
+    },
+    "99dfa0c4298c917d": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-tts/src/textnorm.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "a119e0285d71ef70": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-sfx/src/ambient.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "LOCK"
+    },
+    "a27a95bf8c79d21d": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-tts/src/local.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "aa95460ed61af719": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-music/src/lib.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "ac1929b15d1a68fb": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "comment restates or narrates the code; keep only the why",
+      "path": "crates/qinari-sfx/src/params.rs",
+      "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
     },
     "ae7b26d550e1d9a8": {
       "acked": false,
@@ -70,6 +350,46 @@
       "rule": "COMPLEXITY-FUNC-LINES",
       "severity": "BLOCK"
     },
+    "b46e043dbc8c5e28": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "LOCK"
+    },
+    "b4eb7a4a1b3b8196": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "commented-out code; version control remembers it",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "COMMENTED-CODE",
+      "severity": "LOCK"
+    },
+    "c747b6b881216121": {
+      "acked": false,
+      "count": 1,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:13:14+00:00",
+      "norm_message": "# files and # changed lines; confirm every hunk is needed for the request",
+      "path": "crates/qinari-music/Cargo.toml",
+      "rule": "SCOPE-LARGE",
+      "severity": "WARN"
+    },
+    "cf8bbdd5ccb00fc8": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'engine' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registry an",
+      "path": "crates/qinari-tts/src/lib.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
     "d308924a50ca2245": {
       "acked": false,
       "count": 2,
@@ -79,6 +399,26 @@
       "path": "crates/qinari-dsp/src/noise.rs",
       "rule": "COMPLEXITY-CYCLOMATIC",
       "severity": "BLOCK"
+    },
+    "d67e1832e4c6b6f4": {
+      "acked": false,
+      "count": 6,
+      "first_seen": "2026-11-05T01:13:18+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "# files and # changed lines; confirm every hunk is needed for the request",
+      "path": ".disciplined/memory.json",
+      "rule": "SCOPE-LARGE",
+      "severity": "LOCK"
+    },
+    "e21d2693bfc6246a": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function takes # parameters (max #); bundle them or split the function",
+      "path": "crates/qinari-tts/src/textnorm.rs",
+      "rule": "COMPLEXITY-PARAMS",
+      "severity": "LOCK"
     },
     "e651f7aead75a93c": {
       "acked": false,
@@ -90,6 +430,46 @@
       "rule": "COMPLEXITY-FUNC-LINES",
       "severity": "BLOCK"
     },
+    "e8cddf3249e68b80": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; harmony_for(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "ea40ccac65cbcf69": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-tts/src/cloud.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "LOCK"
+    },
+    "f1f8d0770245dbbc": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; find_recipe(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-sfx/src/recipes.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "f39722d7d09bb87b": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-music/src/tests.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "LOCK"
+    },
     "f4bfd7e8af19862d": {
       "acked": false,
       "count": 2,
@@ -99,6 +479,36 @@
       "path": "crates/qinari-dsp/src/lufs.rs",
       "rule": "COMMENTED-CODE",
       "severity": "BLOCK"
+    },
+    "f5d687053c35c220": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "cyclomatic complexity ~# (max #); branch count demands decomposition",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMPLEXITY-CYCLOMATIC",
+      "severity": "LOCK"
+    },
+    "f67bf9d814ec7870": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function takes # parameters (max #); bundle them or split the function",
+      "path": "crates/qinari-music/src/compose.rs",
+      "rule": "COMPLEXITY-PARAMS",
+      "severity": "LOCK"
+    },
+    "fea14d3845127595": {
+      "acked": false,
+      "count": 7,
+      "first_seen": "2026-11-05T01:13:14+00:00",
+      "last_seen": "2026-11-05T01:14:43+00:00",
+      "norm_message": "function exceeds # lines \u2014 split it; request(): # lines, params=#, nesting=#, cyclomatic~#",
+      "path": "crates/qinari-music/src/tests.rs",
+      "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
     }
   },
   "runs": {
@@ -107,8 +517,8 @@
       "last": "2026-11-05T00:22:21+00:00"
     },
     "check_diff": {
-      "count": 5,
-      "last": "2026-11-05T00:23:06+00:00"
+      "count": 12,
+      "last": "2026-11-05T01:14:43+00:00"
     },
     "coverage_gate": {
       "count": 2,

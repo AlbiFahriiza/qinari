@@ -11,4 +11,19 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
 thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Blocking HTTP with rustls; the `json` feature only adds `send_json`, it pulls
+# no TLS stack of its own (native-tls is never enabled).
+ureq = { version = "3.5.1", features = ["json"] }
+hound = "3.5.1"
+# Exact pin: ONNX Runtime binary API is coupled to the rc series.
+ort = { version = "=2.0.0-rc.15" }
+# Pure-Rust eSpeak NG port; the data features embed the phoneme tables plus
+# the English and Indonesian dictionaries so phonemization is fully offline.
+espeak-ng = { version = "0.2.0", default-features = false, features = [
+    "bundled-data-en",
+    "bundled-data-id",
+] }

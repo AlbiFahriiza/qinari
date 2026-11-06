@@ -106,6 +106,10 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the six-crate
   workspace (`qinari-dsp`/`-audio`/`-sfx`/`-music`/`-tts`/`-cli`) and
   dependency direction.
+- **[docs/RESEARCH-AUDIO-REALISM.md](docs/RESEARCH-AUDIO-REALISM.md)** —
+  verified research groundwork for the 0.1.0 realism engine: texture
+  statistics, physical modeling, the proven TTS PAD bug, voice ceilings,
+  objective quality metrics, Rust ecosystem audit.
 
 ## Non-Rust dependencies
 

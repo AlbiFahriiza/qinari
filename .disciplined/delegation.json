@@ -31,6 +31,30 @@
       "difficulty": "high",
       "fit": "verification agent; runs documented commands against the binary and diffs claims vs code",
       "gated": true
+    },
+    {
+      "id": "R1",
+      "task": "Research: synthesis realism \u2014 texture statistics, physical modeling, stochastic techniques, anti-slop checklist (feeds RESEARCH-AUDIO-REALISM.md)",
+      "subagent": "general-purpose (sonnet)",
+      "difficulty": "high",
+      "fit": "deep web+code research; report-only, no code changes",
+      "gated": true
+    },
+    {
+      "id": "R2",
+      "task": "Research: TTS quality \u2014 Piper/VITS inference semantics, espeak-ng phonemization, voice facts, post-chain practice; identified PAD-interleaving bug",
+      "subagent": "general-purpose (sonnet)",
+      "difficulty": "high",
+      "fit": "deep web+code+binary research; report-only",
+      "gated": true
+    },
+    {
+      "id": "R3",
+      "task": "Research: engine architecture \u2014 middleware object models, analysis-by-synthesis lineage, CI metrics, Rust ecosystem audit (found rubato MSRV conflict)",
+      "subagent": "general-purpose (sonnet)",
+      "difficulty": "high",
+      "fit": "deep web+code research; report-only",
+      "gated": true
     }
   ]
 }

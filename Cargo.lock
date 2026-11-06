@@ -1394,6 +1394,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qinari-verify"
+version = "0.0.5-alpha"
+dependencies = [
+ "ort",
+ "qinari-audio",
+ "qinari-dsp",
+ "realfft",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,28 @@
+[package]
+name = "qinari-verify"
+description = "Qinari verify crate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
+qinari-audio = { version = "0.0.5-alpha", path = "../qinari-audio" }
+thiserror = { workspace = true }
+# Same version the workspace already locks via rubato (design §6: realfft
+# 3.5.1, MSRV 1.61 <= 1.87).
+realfft = "3.5.1"
+# Same version realfft locks (Cargo.lock); needed directly for the odd-size
+# (321-point) FFT in the DNSMOS mel path, which realfft's even-length real
+# FFT cannot express.
+rustfft = "6.4.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Exact pin: ONNX Runtime binary API is coupled to the rc series (same pin
+# as qinari-tts).
+ort = { version = "=2.0.0-rc.15" }

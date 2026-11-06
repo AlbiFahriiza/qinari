@@ -6,6 +6,7 @@ members = [
     "crates/qinari-sfx",
     "crates/qinari-music",
     "crates/qinari-tts",
+    "crates/qinari-verify",
     "crates/qinari-cli",
 ]
 

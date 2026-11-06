@@ -18,7 +18,10 @@ permissions:
 jobs:
   release:
     name: Build, smoke, and publish
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest (26.04) builds against glibc 2.43, which
+    # current Debian stable and every Ubuntu LTS below 26.04 cannot run.
+    # 22.04 keeps the shipped binary usable on glibc >= 2.35 systems.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -54,7 +57,8 @@ jobs:
           body: |
             Qinari ${{ github.ref_name }}
 
-            Prebuilt binary for x86_64-unknown-linux-gnu, bundled with
+            Prebuilt binary for x86_64-unknown-linux-gnu (needs glibc
+            2.35+ — Ubuntu 22.04+, Debian 12+, RHEL 9+), bundled with
             LICENSE and README.md. Verify the download against the
             .sha256 sidecar before use:
 

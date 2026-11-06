@@ -88,6 +88,12 @@ pub fn download(spec: &DownloadSpec) -> Result<(), DownloadError> {
     }
     let part = spec.part_path();
     debug!(url = %spec.url, part = %part.display(), "starting download");
+    // curl only creates the output file, never its directory: a voice id
+    // like en_US-libritts-high names a directory that must exist first,
+    // or curl dies with "write error" on its first body chunk.
+    if let Some(parent) = part.parent() {
+        fs::create_dir_all(parent)?;
+    }
 
     let total = head_content_length(&spec.url)
         .inspect_err(|error| warn!(url = %spec.url, "HEAD failed: {error}"))
@@ -414,6 +420,29 @@ mod tests {
         };
         download(&spec).expect("existence check only");
         assert_eq!(fs::read(&dest).expect("unchanged"), b"{}");
+    }
+
+    #[test]
+    fn missing_destination_directory_is_created() {
+        // Regression: a voice id names a directory under models/ that does
+        // not exist on first install; curl cannot create it itself and
+        // failed with exit 23 ("write error") on the first body chunk.
+        let payload: &'static [u8] = b"nested destination payload";
+        let url = serve(payload);
+        let mut dir = std::env::temp_dir();
+        dir.push(format!("qinari-cli-nested-{}", std::process::id()));
+        let nested = dir.join("en_US-example").join("voice.onnx");
+        let _ = fs::remove_dir_all(&dir);
+        let spec = DownloadSpec {
+            url,
+            dest: nested.clone(),
+            expected_size: Some(payload.len() as u64),
+            expected_sha256: Some(sha256_of(payload)),
+            label: "nested".to_string(),
+        };
+        download(&spec).expect("download creates the destination directory");
+        assert_eq!(fs::read(&nested).expect("file written"), payload);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

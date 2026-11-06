@@ -36,7 +36,7 @@ jobs:
         run: cargo test --workspace
 
   tts-live:
-    name: TTS live test (downloads default voice)
+    name: TTS live test (installs both voices)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +46,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/qinari/models
-          key: qinari-voices-${{ runner.os }}
+          key: qinari-voices-${{ runner.os }}-v2
+      - name: Build the CLI
+        run: cargo build --release --bin qinari
+      - name: Install voices (curl download, SHA-256 verified)
+        run: ./target/release/qinari setup --yes --accept-license
       - name: Run network-dependent tests
         run: cargo test --workspace -- --ignored
 

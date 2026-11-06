@@ -23,9 +23,9 @@ use qinari_sfx::{
     SfxError,
 };
 use qinari_tts::cloud::{CloudConfig, OpenAiCompatibleEngine};
-use qinari_tts::engine::TtsEngine;
-use qinari_tts::local::{ensure_espeak_data, LocalVitsEngine};
-use qinari_tts::voices::{default_voice, find_voice, voices, VoiceEntry};
+use qinari_tts::engine::{ProsodyMode, StyleSpec, TtsEngine, DEFAULT_STEPS};
+use qinari_tts::supertonic::SupertonicEngine;
+use qinari_tts::voices::{default_voice, find_voice, voices, LicenseClass, VoiceEntry};
 use qinari_tts::{Language, SynthRequest, TtsError};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -87,7 +87,7 @@ pub struct SetupArgs {
     /// Non-interactive: never prompt, assume the default answer.
     #[arg(long)]
     pub yes: bool,
-    /// Accept the non-commercial voice licenses without prompting.
+    /// Accept the restricted (OpenRAIL-M) voice license without prompting.
     #[arg(long)]
     pub accept_license: bool,
 }
@@ -461,9 +461,16 @@ fn out_path(out: Option<&Path>, batch: Option<u32>, run: u32) -> PathBuf {
     PathBuf::from(format!("{stem}-{run:03}.{ext}"))
 }
 
-/// Whether a voice's model and config files are both present.
+/// Whether a voice is installed: the shared engine bundle plus the
+/// voice's style file are all present (digests are verified when the
+/// engine loads).
 fn voice_installed(paths: &Paths, voice: &VoiceEntry) -> bool {
-    paths.voice_model(voice.id).exists() && paths.voice_config(voice.id).exists()
+    voice
+        .bundle
+        .files
+        .iter()
+        .all(|file| paths.supertonic_bundle_file(file.rel_path).is_file())
+        && paths.supertonic_style(voice).is_file()
 }
 
 /// Reads TTS input text: a file path, or "-" for stdin.
@@ -501,7 +508,6 @@ pub fn setup(ctx: &mut RunContext, args: &SetupArgs) -> Result<(), QinariError> 
     }
     check_environment(&ctx.paths)?;
     ensure_config(ctx)?;
-    ensure_espeak(&ctx.paths)?;
     for voice in selected_voices(&args.voices)? {
         install_voice(ctx, voice, args)?;
     }
@@ -511,21 +517,30 @@ pub fn setup(ctx: &mut RunContext, args: &SetupArgs) -> Result<(), QinariError> 
     Ok(())
 }
 
-/// Prints the voice catalog with sizes, licenses, and the
-/// non-commercial marker.
+/// Prints the voice catalog with sizes, licenses, and the restricted
+/// marker, plus the shared engine bundle every voice needs.
 fn list_voices() {
+    let bundle = voices()
+        .first()
+        .map(|voice| voice.bundle)
+        .expect("the catalog is never empty");
+    println!(
+        "shared engine bundle: {:.1} MiB (downloaded once, all voices)",
+        bundle.size_bytes() as f64 / (1024.0 * 1024.0)
+    );
     for voice in voices() {
-        let marker = if voice.non_commercial {
-            "  [NON-COMMERCIAL]"
-        } else {
-            ""
+        let marker = match voice.license_class {
+            LicenseClass::NonCommercial => "  [NON-COMMERCIAL]",
+            LicenseClass::Restricted => "  [RESTRICTED]",
+            LicenseClass::Permissive => "",
         };
         println!(
-            "{:<22} {:<3} {:<7} {:>9}  {}{}",
+            "{:<16} {:<10} {:<5} {:>6} Hz  {:>6}  {}{}",
             voice.id,
+            voice.engine.as_str(),
             voice.language,
-            voice.quality,
-            format!("{:.1} MiB", voice.size_bytes as f64 / (1024.0 * 1024.0)),
+            voice.sample_rate,
+            format!("{:.0} KiB", voice.style_size_bytes as f64 / 1024.0),
             voice.license,
             marker
         );
@@ -544,7 +559,7 @@ fn check_environment(paths: &Paths) -> Result<(), QinariError> {
     let dirs = [
         paths.config_file.parent().map(Path::to_path_buf),
         Some(paths.models_dir.clone()),
-        Some(paths.espeak_dir.clone()),
+        Some(paths.supertonic_dir.clone()),
         Some(paths.state_dir.clone()),
     ];
     for dir in dirs.into_iter().flatten() {
@@ -575,12 +590,6 @@ fn ensure_config(ctx: &mut RunContext) -> Result<(), QinariError> {
     Ok(())
 }
 
-/// Installs the bundled espeak data for both languages.
-fn ensure_espeak(paths: &Paths) -> Result<(), QinariError> {
-    ensure_espeak_data(&paths.espeak_dir, &[Language::En, Language::Id])
-        .map_err(|error| QinariError::setup(format!("could not install espeak data: {error}")))
-}
-
 /// Resolves `--voice` filters against the catalog.
 fn selected_voices(filter: &[String]) -> Result<Vec<&'static VoiceEntry>, QinariError> {
     if filter.is_empty() {
@@ -600,7 +609,9 @@ fn selected_voices(filter: &[String]) -> Result<Vec<&'static VoiceEntry>, Qinari
         .collect()
 }
 
-/// Installs one voice: license gate, downloads, validation synthesis.
+/// Installs one voice: license gate, bundle + style downloads, validation
+/// synthesis. The shared engine bundle files are downloaded once —
+/// `download` skips files that are already present and verified.
 fn install_voice(
     ctx: &mut RunContext,
     voice: &'static VoiceEntry,
@@ -611,8 +622,8 @@ fn install_voice(
         .tts
         .accepted_licenses
         .iter()
-        .any(|id| id == voice.id);
-    if voice.non_commercial && !accepted {
+        .any(|id| id == voice.license_id);
+    if voice.license_class != LicenseClass::Permissive && !accepted {
         if args.accept_license {
             record_acceptance(ctx, voice)?;
         } else if args.yes {
@@ -629,25 +640,28 @@ fn install_voice(
     }
     if !ctx.quiet {
         println!(
-            "installing {} ({:.1} MiB)",
+            "installing {} (style {:.0} KiB, shared bundle {:.1} MiB)",
             voice.id,
-            voice.size_bytes as f64 / (1024.0 * 1024.0)
+            voice.style_size_bytes as f64 / 1024.0,
+            voice.bundle.size_bytes() as f64 / (1024.0 * 1024.0)
         );
     }
+    for file in voice.bundle.files {
+        download(&DownloadSpec {
+            url: file.url.to_string(),
+            dest: ctx.paths.supertonic_bundle_file(file.rel_path),
+            expected_size: Some(file.size_bytes),
+            expected_sha256: Some(file.sha256.to_string()),
+            label: format!("supertonic {}", file.rel_path),
+        })
+        .map_err(|error| download_error(&error))?;
+    }
     download(&DownloadSpec {
-        url: voice.url.to_string(),
-        dest: ctx.paths.voice_model(voice.id),
-        expected_size: Some(voice.size_bytes),
-        expected_sha256: Some(voice.sha256.to_string()),
-        label: format!("{} model", voice.id),
-    })
-    .map_err(|error| download_error(&error))?;
-    download(&DownloadSpec {
-        url: voice.config_url.to_string(),
-        dest: ctx.paths.voice_config(voice.id),
-        expected_size: None,
-        expected_sha256: None,
-        label: format!("{} config", voice.id),
+        url: voice.style_url.to_string(),
+        dest: ctx.paths.supertonic_style(voice),
+        expected_size: Some(voice.style_size_bytes),
+        expected_sha256: Some(voice.style_sha256.to_string()),
+        label: format!("{} style", voice.id),
     })
     .map_err(|error| download_error(&error))?;
     validate_synthesis(ctx, voice)
@@ -660,20 +674,41 @@ fn skip_note(ctx: &RunContext, voice: &VoiceEntry, reason: &str) {
     }
 }
 
-/// Persists a license acceptance into the config file.
+/// Persists a license acceptance into the config file. The record is the
+/// license key (shared by every voice under the same license), so one
+/// acceptance covers the whole Supertonic set.
 fn record_acceptance(ctx: &mut RunContext, voice: &VoiceEntry) -> Result<(), QinariError> {
-    ctx.config.tts.accepted_licenses.push(voice.id.to_string());
+    if !ctx
+        .config
+        .tts
+        .accepted_licenses
+        .iter()
+        .any(|id| id == voice.license_id)
+    {
+        ctx.config
+            .tts
+            .accepted_licenses
+            .push(voice.license_id.to_string());
+    }
     ctx.config.save(&ctx.paths.config_file).map_err(|error| {
         QinariError::setup(format!("could not record the license acceptance: {error}"))
     })
 }
 
-/// Asks interactively whether the non-commercial license is accepted.
+/// Asks interactively whether the voice's license is accepted.
 fn confirm_license(ctx: &mut RunContext, voice: &VoiceEntry) -> Result<bool, QinariError> {
+    let restrictions = match voice.license_class {
+        LicenseClass::NonCommercial => "non-commercial use only".to_string(),
+        LicenseClass::Restricted => "commercial use is allowed, but the license carries use \
+             restrictions: the model must not be used to harm or deceive people, impersonate \
+             anyone without consent, or run biometric identification"
+            .to_string(),
+        LicenseClass::Permissive => "no restrictions beyond attribution".to_string(),
+    };
     let answer = Confirm::new()
         .with_prompt(format!(
-            "{} is non-commercial ({}, {}): accept the license and install it?",
-            voice.id, voice.license, voice.license_url
+            "{} is licensed under {} ({}; {}) — accept the license and install it?",
+            voice.id, voice.license, voice.license_url, restrictions
         ))
         .default(false)
         .interact()
@@ -685,26 +720,24 @@ fn confirm_license(ctx: &mut RunContext, voice: &VoiceEntry) -> Result<bool, Qin
 }
 
 /// Speaks one sentence through the freshly installed voice.
-fn validate_synthesis(ctx: &RunContext, voice: &VoiceEntry) -> Result<(), QinariError> {
-    let sentence = if voice.language == "id" {
-        "Qinari uji suara, satu dua tiga."
-    } else {
-        "Qinari voice check, one two three."
-    };
-    let engine = LocalVitsEngine::load(
-        &ctx.paths.voice_model(voice.id),
-        &ctx.paths.espeak_dir,
-        voice,
-    )
-    .map_err(|error| tts_error(&error))?;
+fn validate_synthesis(ctx: &RunContext, voice: &'static VoiceEntry) -> Result<(), QinariError> {
+    // Every Supertonic voice is multilingual; validate in Indonesian, the
+    // project's primary language.
+    let sentence = "Qinari uji suara, satu dua tiga.";
+    let engine = SupertonicEngine::load(&ctx.paths.supertonic_dir, voice)
+        .map_err(|error| tts_error(&error))?;
     let request = SynthRequest {
         text: sentence.to_string(),
-        language: Language::from_code(voice.language)
-            .ok_or_else(|| QinariError::tts(format!("unsupported language {}", voice.language)))?,
+        language: Language::Id,
         speed: 1.0,
         voice: voice.id.to_string(),
         sr: voice.sample_rate,
         channels: 1,
+        steps: DEFAULT_STEPS,
+        seed: None,
+        prosody: ProsodyMode::Natural,
+        style: StyleSpec::Default,
+        markup: true,
     };
     let synthesis = engine
         .synthesize(&request)
@@ -723,9 +756,9 @@ fn validate_synthesis(ctx: &RunContext, voice: &VoiceEntry) -> Result<(), Qinari
 
 /// Runs `qinari doctor` and returns whether the installation is healthy.
 ///
-/// Health means: curl works, espeak data for both languages is present,
-/// and at least one voice is installed. A missing config file and a
-/// missing cloud key are informational, not unhealthy.
+/// Health means: curl works, the shared Supertonic engine bundle is
+/// installed, and at least one voice is installed. A missing config file
+/// and a missing cloud key are informational, not unhealthy.
 pub fn doctor(ctx: &RunContext) -> bool {
     let mut problems = 0;
     match Command::new("curl").arg("--version").output() {
@@ -747,18 +780,24 @@ pub fn doctor(ctx: &RunContext) -> bool {
     } else {
         println!("info: no config file (defaults in use); `qinari setup` writes one");
     }
-    for code in ["en", "id"] {
-        let marker = ctx.paths.espeak_dir.join(format!(".qinari-espeak-{code}"));
-        if marker.exists() {
-            println!("ok: espeak data for {code} is installed");
-        } else {
-            problems += 1;
-            println!("problem: espeak data for {code} is missing; run `qinari setup`");
-        }
+    let sample_voice = voices()
+        .first()
+        .copied()
+        .expect("the catalog is never empty");
+    let bundle_installed = sample_voice
+        .bundle
+        .files
+        .iter()
+        .all(|file| ctx.paths.supertonic_bundle_file(file.rel_path).is_file());
+    if bundle_installed {
+        println!("ok: the supertonic engine bundle is installed");
+    } else {
+        problems += 1;
+        println!("problem: the supertonic engine bundle is missing; run `qinari setup`");
     }
     let installed: Vec<&VoiceEntry> = voices()
         .iter()
-        .filter(|voice| voice_installed(&ctx.paths, voice))
+        .filter(|voice| ctx.paths.supertonic_style(voice).is_file())
         .collect();
     if installed.is_empty() {
         problems += 1;
@@ -991,7 +1030,9 @@ pub fn tts(ctx: &RunContext, args: &TtsArgs) -> Result<(), QinariError> {
         _ => voice_installed(&ctx.paths, voice),
     };
     let audio = if use_local {
-        synthesize_locally(ctx, voice, &text, language, args.speed, channels)?
+        synthesize_locally(
+            ctx, voice, &text, language, args.speed, channels, options.sr,
+        )?
     } else {
         synthesize_in_cloud(
             ctx, voice, &text, language, args.speed, channels, options.sr,
@@ -1021,8 +1062,8 @@ fn engine_preference(ctx: &RunContext, flag: Option<&str>) -> Result<String, Qin
     }
 }
 
-/// Speaks through the installed local voice; the render path resamples the
-/// 22 050 Hz output to the target rate afterwards.
+/// Speaks through the installed local voice. The engine synthesizes at
+/// its native 44 100 Hz and resamples to the target rate itself.
 fn synthesize_locally(
     ctx: &RunContext,
     voice: &'static VoiceEntry,
@@ -1030,6 +1071,7 @@ fn synthesize_locally(
     language: Language,
     speed: f32,
     channels: u16,
+    sr: u32,
 ) -> Result<qinari_dsp::buffer::AudioBuffer, QinariError> {
     if !voice_installed(&ctx.paths, voice) {
         return Err(QinariError::tts(format!(
@@ -1037,19 +1079,26 @@ fn synthesize_locally(
             voice.id
         )));
     }
-    let engine = LocalVitsEngine::load(
-        &ctx.paths.voice_model(voice.id),
-        &ctx.paths.espeak_dir,
-        voice,
-    )
-    .map_err(|error| tts_error(&error))?;
+    let (clamped, was_clamped) = SupertonicEngine::clamp_speed(speed);
+    if was_clamped {
+        eprintln!(
+            "warning: --speed {speed} is outside the voice's 0.7..=2.0 range; using {clamped} instead"
+        );
+    }
+    let engine = SupertonicEngine::load(&ctx.paths.supertonic_dir, voice)
+        .map_err(|error| tts_error(&error))?;
     let request = SynthRequest {
         text: text.to_string(),
         language,
         speed,
         voice: voice.id.to_string(),
-        sr: voice.sample_rate,
+        sr,
         channels,
+        steps: DEFAULT_STEPS,
+        seed: None,
+        prosody: ProsodyMode::Natural,
+        style: StyleSpec::Default,
+        markup: true,
     };
     Ok(engine
         .synthesize(&request)
@@ -1083,6 +1132,11 @@ fn synthesize_in_cloud(
         voice: voice.id.to_string(),
         sr,
         channels,
+        steps: DEFAULT_STEPS,
+        seed: None,
+        prosody: ProsodyMode::Natural,
+        style: StyleSpec::Default,
+        markup: true,
     };
     Ok(engine
         .synthesize(&request)
@@ -1271,7 +1325,7 @@ pub fn info(ctx: &RunContext, args: &InfoArgs) -> Result<(), QinariError> {
             "paths": {
                 "config": ctx.paths.config_file,
                 "models": ctx.paths.models_dir,
-                "espeak": ctx.paths.espeak_dir,
+                "supertonic": ctx.paths.supertonic_dir,
                 "state": ctx.paths.state_dir,
                 "log": ctx.paths.log_file(),
             },
@@ -1292,7 +1346,7 @@ pub fn info(ctx: &RunContext, args: &InfoArgs) -> Result<(), QinariError> {
     println!("qinari {}", env!("CARGO_PKG_VERSION"));
     println!("config file: {}", ctx.paths.config_file.display());
     println!("models dir: {}", ctx.paths.models_dir.display());
-    println!("espeak dir: {}", ctx.paths.espeak_dir.display());
+    println!("supertonic dir: {}", ctx.paths.supertonic_dir.display());
     println!("state dir: {}", ctx.paths.state_dir.display());
     println!("engine preference: {}", ctx.config.tts.engine);
     println!(

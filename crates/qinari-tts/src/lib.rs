@@ -1,31 +1,40 @@
-//! Qinari tts crate: offline VITS synthesis, OpenAI-compatible cloud
-//! synthesis, and shared text normalization.
+//! Qinari tts crate: the bundled Supertonic engine, OpenAI-compatible
+//! cloud synthesis, and shared text machinery.
 //!
-//! Two engines implement [`TtsEngine`] over the same
+//! Engines implement [`TtsEngine`] over the same
 //! [`SynthRequest`]/[`Synthesis`] contract:
 //!
-//! - [`local::LocalVitsEngine`] runs Piper-class VITS voices through ONNX
-//!   Runtime (`ort`), phonemized offline by the pure-Rust eSpeak NG port;
-//!   both bundled voices produce 22 050 Hz mono audio.
+//! - [`supertonic::SupertonicEngine`] is the bundled local engine: Supertonic 3
+//!   driven through four ONNX Runtime (`ort`) sessions, seeded and
+//!   reproducible, producing 44 100 Hz mono audio in ten voices
+//!   (`supertonic-M1…M5, F1…F5`, all multilingual).
 //! - [`cloud::OpenAiCompatibleEngine`] speaks the `OpenAI`
 //!   `POST /audio/speech` protocol, so any compatible service works.
 //!
 //! Both engines expand numbers first ([`textnorm::expand_numbers`]) and
-//! bound each synthesis call with [`textnorm::chunk_text`].
+//! bound each synthesis call with [`textnorm::chunk_text`]. Qinari markup
+//! (`[laugh]` `[breath]` `[sigh]` `[pause:<ms>]`, see [`markup`]) is parsed
+//! before synthesis; unknown tags are hard errors.
 //!
-//! All randomness-free, all offline for the local engine: model files and
-//! eSpeak data are downloaded once by the CLI and verified against the
-//! pinned digests in [`voices`].
+//! All local randomness flows through the seeded [`qinari_dsp::rng::Qrng`]:
+//! the same [`SynthRequest::seed`] renders the same audio (up to ONNX
+//! Runtime float-order nondeterminism). Model files are downloaded once by
+//! the CLI and verified against the pinned digests in [`voices`] both at
+//! install time and at engine load.
 
 pub mod cloud;
 pub mod engine;
-pub mod local;
+pub mod markup;
+pub mod prosody;
+pub mod supertonic;
 pub mod textnorm;
 pub mod voices;
 
-pub use engine::{SynthRequest, Synthesis, SynthesisStats, TtsEngine};
+pub use engine::{
+    SynthRequest, Synthesis, SynthesisStats, TtsEngine, DEFAULT_STEPS, MAX_STEPS, MIN_STEPS,
+};
 pub use textnorm::{chunk_text, expand_numbers, Language};
-pub use voices::{default_voice, find_voice, voices, VoiceEntry};
+pub use voices::{default_voice, find_voice, voices, EngineKind, LicenseClass, VoiceEntry};
 
 use thiserror::Error;
 
@@ -49,6 +58,16 @@ pub enum TtsError {
         /// The offending speed factor.
         value: f32,
     },
+    /// The denoising-step count was outside `1..=100`.
+    #[error("steps {value} is out of range ({min}..={max})")]
+    StepsOutOfRange {
+        /// The offending step count.
+        value: u8,
+        /// The lowest accepted step count.
+        min: u8,
+        /// The highest accepted step count.
+        max: u8,
+    },
     /// The channel count was neither 1 nor 2.
     #[error("{channels} audio channels requested (only 1 or 2 supported)")]
     BadChannels {
@@ -60,15 +79,6 @@ pub enum TtsError {
     BadSampleRate {
         /// The offending sample rate in hertz.
         rate: u32,
-    },
-    /// The engine cannot produce audio at the requested rate; the caller
-    /// should synthesize at the supported rate and resample afterwards.
-    #[error("this voice produces {supported} Hz audio; {requested} Hz was requested (synthesize at {supported} Hz and resample the result instead)")]
-    UnsupportedSampleRate {
-        /// The requested sample rate in hertz.
-        requested: u32,
-        /// The voice's native sample rate in hertz.
-        supported: u32,
     },
     /// No voice with the given catalog id exists.
     #[error("unknown voice '{id}'")]
@@ -101,11 +111,30 @@ pub enum TtsError {
         /// What was wrong with the response.
         detail: String,
     },
-    /// The voice configuration file (`.onnx.json`) was missing, unreadable,
-    /// or did not match the expected format.
-    #[error("invalid voice configuration: {detail}")]
-    VoiceConfig {
-        /// What was wrong with the configuration.
+    /// The model directory is missing files, unreadable, or fails its
+    /// pinned digests.
+    #[error("invalid model directory: {detail}")]
+    ModelDir {
+        /// What is wrong with the directory.
+        detail: String,
+    },
+    /// A voice-style file is missing, unreadable, or malformed.
+    #[error("invalid voice style: {detail}")]
+    Style {
+        /// What is wrong with the style.
+        detail: String,
+    },
+    /// The text contains markup that does not parse.
+    #[error("invalid markup: {detail}")]
+    Markup {
+        /// What is wrong with the markup.
+        detail: String,
+    },
+    /// The engine could not run its graphs or use their output (bad tensor
+    /// shape, resampling failure).
+    #[error("inference failed: {detail}")]
+    Inference {
+        /// What failed.
         detail: String,
     },
     /// The ONNX Runtime environment could not be initialized.
@@ -114,9 +143,6 @@ pub enum TtsError {
     /// ONNX Runtime rejected the model or failed during inference.
     #[error("ONNX Runtime error: {0}")]
     Onnx(#[from] ort::Error),
-    /// eSpeak NG failed to load its data or phonemize the text.
-    #[error("espeak-ng error: {0}")]
-    Espeak(#[from] espeak_ng::Error),
     /// A file could not be read or written.
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),

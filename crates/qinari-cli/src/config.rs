@@ -8,10 +8,16 @@
 
 use crate::xcode::QinariError;
 use directories::ProjectDirs;
+use qinari_tts::voices::VoiceEntry;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::debug;
+
+/// Environment variable pointing at an already-populated Supertonic model
+/// directory (the one holding `onnx/` and `voice_styles/`), overriding the
+/// default location. Useful for tests and custom local model bundles.
+pub const SUPERTONIC_DIR_ENV: &str = "QINARI_SUPERTONIC_DIR";
 
 /// Resolved filesystem layout for one machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,8 +26,9 @@ pub struct Paths {
     pub config_file: PathBuf,
     /// Downloaded voice models: `~/.local/share/qinari/models`.
     pub models_dir: PathBuf,
-    /// eSpeak NG data: `<models>/espeak-data`.
-    pub espeak_dir: PathBuf,
+    /// The Supertonic model directory (`<models>/supertonic`, or the
+    /// `QINARI_SUPERTONIC_DIR` override): `onnx/` plus `voice_styles/`.
+    pub supertonic_dir: PathBuf,
     /// State (log) directory: `~/.local/state/qinari`.
     pub state_dir: PathBuf,
 }
@@ -42,22 +49,27 @@ impl Paths {
         let state_dir = dirs
             .state_dir()
             .map_or_else(|| dirs.data_dir().join("state"), Path::to_path_buf);
+        let models_dir = dirs.data_dir().join("models");
+        let supertonic_dir = std::env::var_os(SUPERTONIC_DIR_ENV)
+            .map_or_else(|| models_dir.join("supertonic"), PathBuf::from);
         Ok(Self {
             config_file: dirs.config_dir().join("config.toml"),
-            models_dir: dirs.data_dir().join("models"),
-            espeak_dir: dirs.data_dir().join("models").join("espeak-data"),
+            models_dir,
+            supertonic_dir,
             state_dir,
         })
     }
 
-    /// The `.onnx` model file for the voice with this catalog id.
-    pub fn voice_model(&self, id: &str) -> PathBuf {
-        self.models_dir.join(id).join("voice.onnx")
+    /// The voice-style file of `voice` inside the model directory.
+    pub fn supertonic_style(&self, voice: &VoiceEntry) -> PathBuf {
+        self.supertonic_dir
+            .join("voice_styles")
+            .join(format!("{}.json", voice.style_name))
     }
 
-    /// The `.onnx.json` configuration sibling for the voice with this id.
-    pub fn voice_config(&self, id: &str) -> PathBuf {
-        self.models_dir.join(id).join("voice.onnx.json")
+    /// One file of the shared engine bundle inside the model directory.
+    pub fn supertonic_bundle_file(&self, rel_path: &str) -> PathBuf {
+        self.supertonic_dir.join(rel_path)
     }
 
     /// The log file: `<state>/qinari.log`.
@@ -275,27 +287,28 @@ mod tests {
         config
             .tts
             .accepted_licenses
-            .push("id_ID-news_tts-medium".to_string());
+            .push("supertonic-openrail-m".to_string());
         config.save(&path).expect("save creates parents");
         let loaded = Config::load(&path).expect("round trip loads");
         assert_eq!(loaded, config);
     }
 
     #[test]
-    fn voice_files_live_under_their_catalog_id() {
+    fn supertonic_files_live_under_the_model_dir() {
         let paths = Paths {
             config_file: PathBuf::from("/tmp/qinari-config/config.toml"),
             models_dir: PathBuf::from("/tmp/qinari-models"),
-            espeak_dir: PathBuf::from("/tmp/qinari-models/espeak-data"),
+            supertonic_dir: PathBuf::from("/tmp/qinari-models/supertonic"),
             state_dir: PathBuf::from("/tmp/qinari-state"),
         };
+        let voice = qinari_tts::find_voice("supertonic-M1").expect("catalog voice");
         assert_eq!(
-            paths.voice_model("en_US-libritts-high"),
-            PathBuf::from("/tmp/qinari-models/en_US-libritts-high/voice.onnx")
+            paths.supertonic_style(voice),
+            PathBuf::from("/tmp/qinari-models/supertonic/voice_styles/M1.json")
         );
         assert_eq!(
-            paths.voice_config("en_US-libritts-high"),
-            PathBuf::from("/tmp/qinari-models/en_US-libritts-high/voice.onnx.json")
+            paths.supertonic_bundle_file("onnx/tts.json"),
+            PathBuf::from("/tmp/qinari-models/supertonic/onnx/tts.json")
         );
         assert_eq!(
             paths.log_file(),

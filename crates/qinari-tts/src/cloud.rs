@@ -450,6 +450,11 @@ mod tests {
             voice: "cloud".to_string(),
             sr: 22_050,
             channels: 1,
+            steps: crate::engine::DEFAULT_STEPS,
+            seed: None,
+            prosody: crate::engine::ProsodyMode::Natural,
+            style: crate::engine::StyleSpec::Default,
+            markup: true,
         }
     }
 

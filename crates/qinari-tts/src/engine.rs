@@ -1,8 +1,9 @@
 //! The engine-agnostic synthesis contract: requests, validation, and
-//! results shared by the local VITS engine and the cloud engine.
+//! results shared by the Supertonic engine and the cloud engine.
 
 use crate::TtsError;
 use qinari_dsp::buffer::AudioBuffer;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Maximum text length accepted by [`SynthRequest::validate`] (in Unicode
@@ -15,11 +16,45 @@ pub const MIN_SPEED: f32 = 0.5;
 /// Upper bound for the speed factor.
 pub const MAX_SPEED: f32 = 2.0;
 
+/// Lowest denoising-step count a request may name.
+pub const MIN_STEPS: u8 = 1;
+
+/// Highest denoising-step count a request may name.
+pub const MAX_STEPS: u8 = 100;
+
+/// Default denoising-step count (the reference SDK's default).
+pub const DEFAULT_STEPS: u8 = 8;
+
 /// Lowest sample rate a request may name.
 pub const MIN_SAMPLE_RATE: u32 = 8_000;
 
 /// Highest sample rate a request may name.
 pub const MAX_SAMPLE_RATE: u32 = 192_000;
+
+/// How the prosody post-chain treats a render.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ProsodyMode {
+    /// The engine's natural output: punctuation-classified inter-chunk
+    /// pauses plus bounded, seeded per-sentence rate jitter.
+    #[default]
+    Natural,
+    /// Exactly the reference SDK's behavior: fixed inter-chunk silence,
+    /// no rate jitter.
+    Flat,
+}
+
+/// Which voice style a render uses.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum StyleSpec {
+    /// The requesting voice's own bundled preset style (the default).
+    #[default]
+    Default,
+    /// Another catalog preset, by style name (`M2`, `F1`) or full voice id
+    /// (`supertonic-M2`).
+    Preset(String),
+    /// A custom style file (Supertonic voice-style JSON) on disk.
+    File(PathBuf),
+}
 
 /// A speech synthesis request.
 #[derive(Debug, Clone)]
@@ -27,20 +62,36 @@ pub struct SynthRequest {
     /// Text to speak. Validated non-empty and at most
     /// [`MAX_TEXT_CHARS`] characters.
     pub text: String,
-    /// Language of the text; drives number normalization and phonemization.
+    /// Language of the text; drives number normalization, phonemization,
+    /// and the Supertonic language token.
     pub language: crate::textnorm::Language,
     /// Speed factor: `1.0` is the voice's natural pace, `0.5` twice as
-    /// slow, `2.0` twice as fast.
+    /// slow, `2.0` twice as fast. The Supertonic engine accepts this full
+    /// range and clamps to its own `0.7..=2.0` with a warning.
     pub speed: f32,
     /// Voice catalog id (see [`crate::voices::voices`]).
     pub voice: String,
-    /// Target sample rate of the returned audio. The local VITS engine
-    /// only produces its voice's native rate (22 050 Hz for both bundled
-    /// voices) and rejects anything else; the cloud engine returns whatever
-    /// rate the service sends.
+    /// Target sample rate of the returned audio. The Supertonic engine
+    /// synthesizes at its native 44 100 Hz and resamples to this rate
+    /// when it differs; the cloud engine returns whatever rate the
+    /// service sends.
     pub sr: u32,
     /// Target channel count of the returned audio: 1 or 2.
     pub channels: u16,
+    /// Flow-matching denoising steps (`1..=100`); more steps trade speed
+    /// for quality. Defaults to [`DEFAULT_STEPS`].
+    pub steps: u8,
+    /// Seed for the initial-latent draw and prosody jitter. The same seed
+    /// renders the same audio (up to ONNX Runtime float-order); `None`
+    /// draws a time-based seed so every render differs.
+    pub seed: Option<u64>,
+    /// How the prosody post-chain treats this render.
+    pub prosody: ProsodyMode,
+    /// Which voice style this render uses.
+    pub style: StyleSpec,
+    /// Whether Qinari markup (`[laugh]`, `[pause:400]`, …) in `text` is
+    /// parsed. When `false`, the text is spoken verbatim.
+    pub markup: bool,
 }
 
 impl SynthRequest {
@@ -51,6 +102,7 @@ impl SynthRequest {
     /// Returns [`TtsError::EmptyText`] for empty or whitespace-only text,
     /// [`TtsError::TextTooLong`] above [`MAX_TEXT_CHARS`] characters,
     /// [`TtsError::SpeedOutOfRange`] outside `0.5..=2.0` (NaN included),
+    /// [`TtsError::StepsOutOfRange`] outside `1..=100`,
     /// [`TtsError::BadChannels`] for channel counts other than 1 or 2, and
     /// [`TtsError::BadSampleRate`] outside `8000..=192000` Hz.
     pub fn validate(&self) -> Result<(), TtsError> {
@@ -66,6 +118,13 @@ impl SynthRequest {
         }
         if !(MIN_SPEED..=MAX_SPEED).contains(&self.speed) {
             return Err(TtsError::SpeedOutOfRange { value: self.speed });
+        }
+        if !(MIN_STEPS..=MAX_STEPS).contains(&self.steps) {
+            return Err(TtsError::StepsOutOfRange {
+                value: self.steps,
+                min: MIN_STEPS,
+                max: MAX_STEPS,
+            });
         }
         if self.channels != 1 && self.channels != 2 {
             return Err(TtsError::BadChannels {
@@ -102,9 +161,9 @@ pub struct Synthesis {
 
 /// A text-to-speech engine.
 ///
-/// Implemented by [`crate::local::LocalVitsEngine`] (offline VITS via ONNX
-/// Runtime) and [`crate::cloud::OpenAiCompatibleEngine`] (any
-/// OpenAI-compatible speech service).
+/// Implemented by [`crate::supertonic::SupertonicEngine`] (the bundled
+/// local engine, ONNX Runtime) and [`crate::cloud::OpenAiCompatibleEngine`]
+/// (any OpenAI-compatible speech service).
 pub trait TtsEngine {
     /// Synthesizes `request` into speech.
     ///
@@ -185,9 +244,14 @@ mod tests {
             text: "Hello world.".to_string(),
             language: Language::En,
             speed: 1.0,
-            voice: "en_US-libritts-high".to_string(),
-            sr: 22_050,
+            voice: "supertonic-M1".to_string(),
+            sr: 44_100,
             channels: 1,
+            steps: DEFAULT_STEPS,
+            seed: Some(42),
+            prosody: ProsodyMode::default(),
+            style: StyleSpec::default(),
+            markup: true,
         }
     }
 
@@ -258,6 +322,25 @@ mod tests {
     }
 
     #[test]
+    fn steps_bounds_are_enforced() {
+        for steps in [0_u8, 101, 255] {
+            let bad = SynthRequest { steps, ..request() };
+            match bad.validate() {
+                Err(TtsError::StepsOutOfRange { value, min, max }) => {
+                    assert_eq!(value, steps);
+                    assert_eq!((min, max), (MIN_STEPS, MAX_STEPS));
+                }
+                other => panic!("expected StepsOutOfRange for {steps}, got {other:?}"),
+            }
+        }
+        let edges = SynthRequest {
+            steps: MAX_STEPS,
+            ..request()
+        };
+        assert!(edges.validate().is_ok());
+    }
+
+    #[test]
     fn channel_and_rate_bounds_are_enforced() {
         for channels in [0, 3, 8] {
             let bad = SynthRequest {
@@ -281,6 +364,15 @@ mod tests {
             ..request()
         };
         assert!(edge.validate().is_ok());
+    }
+
+    #[test]
+    fn speed_and_steps_defaults_match_the_reference_sdk() {
+        assert_eq!(DEFAULT_STEPS, 8);
+        assert_eq!((MIN_STEPS, MAX_STEPS), (1, 100));
+        assert_eq!((MIN_SPEED, MAX_SPEED), (0.5, 2.0));
+        assert_eq!(ProsodyMode::default(), ProsodyMode::Natural);
+        assert_eq!(StyleSpec::default(), StyleSpec::Default);
     }
 
     #[test]

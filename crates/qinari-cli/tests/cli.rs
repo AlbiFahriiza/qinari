@@ -75,6 +75,7 @@ impl Sandbox {
             .env_remove("QINARI_TTS_API_KEY")
             .env_remove("OPENAI_API_KEY")
             .env_remove("RUST_LOG")
+            .env_remove("QINARI_SUPERTONIC_DIR")
             .current_dir(&self.work);
         command
     }
@@ -182,18 +183,29 @@ fn music_listing_shows_all_5_styles() {
 }
 
 #[test]
-fn setup_voice_listing_marks_the_non_commercial_voice() {
+fn setup_voice_listing_marks_the_restricted_license() {
     let sandbox = Sandbox::new("voice-list");
     let output = sandbox.ok(&["setup", "--list-voices"]);
     let text = stdout(&output);
-    assert!(text.contains("en_US-libritts-high"));
-    assert!(text.contains("id_ID-news_tts-medium"));
-    assert!(text.contains("CC BY 4.0"));
-    let id_line = text
-        .lines()
-        .find(|line| line.starts_with("id_ID-news_tts-medium"))
-        .expect("the id voice line");
-    assert!(id_line.contains("NON-COMMERCIAL"), "{id_line}");
+    assert!(text.contains("shared engine bundle"));
+    assert!(text.contains("supertonic-M1"));
+    assert!(text.contains("supertonic-F5"));
+    assert!(text.contains("OpenRAIL-M"));
+    for id in [
+        "supertonic-M1",
+        "supertonic-M5",
+        "supertonic-F1",
+        "supertonic-F5",
+    ] {
+        let line = text
+            .lines()
+            .find(|line| line.starts_with(id))
+            .unwrap_or_else(|| panic!("the {id} line"));
+        assert!(line.contains("[RESTRICTED]"), "{line}");
+    }
+    // The Piper voices are gone.
+    assert!(!text.contains("libritts"));
+    assert!(!text.contains("news_tts"));
 }
 
 #[test]
@@ -421,21 +433,28 @@ fn doctor_reports_unhealthy_on_an_empty_home() {
         .stdout(predicate::str::contains("problems found"));
 }
 
-/// Installs the doctor stubs: config file, espeak markers, one voice.
+/// Installs the doctor stubs: config file, the engine bundle files, one
+/// voice style.
 fn install_doctor_stubs(sandbox: &Sandbox) {
     let config = sandbox.home.join(".config/qinari");
     std::fs::create_dir_all(&config).expect("config dir");
     std::fs::write(config.join("config.toml"), "").expect("config file");
-    let espeak = sandbox.home.join(".local/share/qinari/models/espeak-data");
-    std::fs::create_dir_all(&espeak).expect("espeak dir");
-    std::fs::write(espeak.join(".qinari-espeak-en"), b"").expect("en marker");
-    std::fs::write(espeak.join(".qinari-espeak-id"), b"").expect("id marker");
-    let voice = sandbox
-        .home
-        .join(".local/share/qinari/models/en_US-libritts-high");
-    std::fs::create_dir_all(&voice).expect("voice dir");
-    std::fs::write(voice.join("voice.onnx"), b"stub").expect("model stub");
-    std::fs::write(voice.join("voice.onnx.json"), b"{}").expect("config stub");
+    let model = sandbox.home.join(".local/share/qinari/models/supertonic");
+    let onnx = model.join("onnx");
+    std::fs::create_dir_all(&onnx).expect("onnx dir");
+    for name in [
+        "duration_predictor.onnx",
+        "text_encoder.onnx",
+        "vector_estimator.onnx",
+        "vocoder.onnx",
+        "tts.json",
+        "unicode_indexer.json",
+    ] {
+        std::fs::write(onnx.join(name), b"stub").expect("bundle stub");
+    }
+    let styles = model.join("voice_styles");
+    std::fs::create_dir_all(&styles).expect("styles dir");
+    std::fs::write(styles.join("M1.json"), b"{}").expect("style stub");
 }
 
 #[test]
@@ -448,9 +467,7 @@ fn doctor_is_healthy_with_all_stubs_in_place() {
         .assert()
         .success()
         .stdout(predicate::str::contains("healthy"))
-        .stdout(predicate::str::contains(
-            "voice en_US-libritts-high is installed",
-        ));
+        .stdout(predicate::str::contains("voice supertonic-M1 is installed"));
 }
 
 #[test]
@@ -461,7 +478,7 @@ fn info_json_reports_the_whole_state() {
     assert!(text.contains("\"version\":\"0.0.5-alpha\""), "{text}");
     assert!(text.contains("\"paths\""));
     assert!(text.contains("\"engine\":\"auto\""));
-    assert!(text.contains("\"en_US-libritts-high\""));
+    assert!(text.contains("\"supertonic-M1\""));
     assert!(text.contains("\"installed\":false"));
     // The JSON is valid: the document ends in a closing brace.
     assert!(text.trim_end().ends_with('}'), "{text}");

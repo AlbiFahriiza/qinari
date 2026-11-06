@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
+qinari-audio = { version = "0.0.5-alpha", path = "../qinari-audio" }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,9 +22,5 @@ ureq = { version = "3.5.1", features = ["json"] }
 hound = "3.5.1"
 # Exact pin: ONNX Runtime binary API is coupled to the rc series.
 ort = { version = "=2.0.0-rc.15" }
-# Pure-Rust eSpeak NG port; the data features embed the phoneme tables plus
-# the English and Indonesian dictionaries so phonemization is fully offline.
-espeak-ng = { version = "0.2.0", default-features = false, features = [
-    "bundled-data-en",
-    "bundled-data-id",
-] }
+# Bundle digest verification (same pinned version the CLI downloader uses).
+sha2 = { workspace = true }

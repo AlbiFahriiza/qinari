@@ -110,6 +110,11 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
   verified research groundwork for the 0.1.0 realism engine: texture
   statistics, physical modeling, the proven TTS PAD bug, voice ceilings,
   objective quality metrics, Rust ecosystem audit.
+- **[docs/DESIGN-REALISM-ENGINE.md](docs/DESIGN-REALISM-ENGINE.md)** —
+  the staged architecture built on that research: TTS sequencer fix,
+  latent-modulation DSP, physics-shaped families, verification crate,
+  data-driven scenes, authoring-time refinement (0.1.0/0.2.0 roadmap
+  with acceptance criteria).
 
 ## Non-Rust dependencies
 

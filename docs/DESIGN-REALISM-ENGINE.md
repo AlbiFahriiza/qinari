@@ -418,6 +418,8 @@ latent-field calibration drift (analytic steady-state + unit tests,
 
 No neural SFX synthesis, no voice training or fine-tuning, no real-time
 rendering, no GUI, no bundled reference recordings (license), no
-Wwise-specific container semantics (unverifiable sources, §12-6), no
-change to the cloud-TTS path beyond sharing the text-normalization
-hooks.
+Wwise-specific container semantics (unverifiable sources, §12-6). The TTS
+scope note that used to live here ("no change to the cloud-TTS path beyond
+sharing the text-normalization hooks") is superseded by
+`DESIGN-TTS-EXPRESSIVE.md` (owner instruction of 2026-11-06: expressive,
+narrator-class TTS).

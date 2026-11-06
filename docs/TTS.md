@@ -1,8 +1,8 @@
 # Qinari TTS
 
 Qinari speaks Indonesian and English. The same `qinari tts` command
-drives two engines: a fully offline neural voice on your machine, and
-an OpenAI-compatible cloud service.
+drives a fully offline neural voice on your machine and two cloud
+services: any OpenAI-compatible endpoint, and ElevenLabs.
 
 ```
 qinari tts "Halo, selamat datang di Qinari." --lang id -o halo.wav
@@ -83,6 +83,33 @@ endpoint (defaults: `https://api.openai.com/v1`, model
 The retry path is pinned by mock-server tests: authentication headers
 and body fields, 5xx-then-success retry counting, timeout on a stalled
 body, and rejection of non-WAV responses.
+
+### The ElevenLabs lane
+
+`ElevenLabsEngine` speaks the ElevenLabs v1 TTS API (`POST
+/v1/text-to-speech/{voice_id}` with the `xi-api-key` header; endpoint
+per request, model and retries configured on the engine).
+
+- The key comes from `QINARI_ELEVENLABS_API_KEY` — environment only,
+  never in the config file, never in the log.
+- Models: `eleven_v4` (the default) or `eleven_v4_turbo`, the ~100 ms
+  real-time variant. Both cover 90+ languages, including Indonesian and
+  Javanese.
+- The voice is an ElevenLabs voice id (their UUID or a library name),
+  either raw or with the `elevenlabs-` prefix; an id configured on the
+  engine wins.
+- Markup passes through to the model's documented audio-tag vocabulary:
+  `[laugh]` → `[laughs]`, `[breath]` → `[exhales]`, `[sigh]` →
+  `[sighs]`. `[pause:<ms>]` inserts exact silence; joins without a
+  pause use the same 0.25 s as the OpenAI lane.
+- Output is WAV, at the supported rate nearest the requested one. Note:
+  44.1 kHz WAV output requires a Pro-tier ElevenLabs key — name another
+  rate to avoid that gate.
+- No streaming, no voice cloning, no pronunciation dictionaries:
+  blocking, whole-body requests only.
+
+The lane is pinned by the same mock-server test family as the OpenAI
+lane, plus tag-map, pause-exactness, and voice-resolution unit tests.
 
 ## Files
 

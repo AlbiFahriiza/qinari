@@ -15,7 +15,7 @@
 pub enum EngineKind {
     /// The bundled local Supertonic 3 engine (ONNX Runtime, 44 100 Hz).
     Supertonic,
-    /// A future `ElevenLabs` cloud engine (engine lane only; not
+    /// The `ElevenLabs` cloud engine (configured and key-gated; not
     /// installable).
     ElevenLabs,
     /// The OpenAI-compatible cloud engine (configured, not downloaded).

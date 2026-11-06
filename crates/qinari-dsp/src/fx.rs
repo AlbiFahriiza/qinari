@@ -43,6 +43,17 @@ impl Delay {
         self.feedback = feedback.clamp(0.0, 0.99);
     }
 
+    /// Reads the delayed sample that the next [`Delay::process`] call
+    /// will overwrite, without advancing the line.
+    ///
+    /// With feedback 0 this is a clean feed-forward tap `line_samples`
+    /// behind the write head — the primitive the spatial-reflection
+    /// helpers are built on (call it *before* `process` writes the new
+    /// sample).
+    pub fn tap(&self) -> f32 {
+        self.buffer[self.index]
+    }
+
     /// Processes one sample and returns dry + delayed feedback.
     pub fn process(&mut self, x: f32) -> f32 {
         let y = x + self.feedback * self.buffer[self.index];
@@ -452,6 +463,25 @@ mod tests {
         assert!((out[300] - 0.125).abs() < 1e-5, "echo 3 {}", out[300]);
         assert!((out[400] - 0.0625).abs() < 1e-5, "echo 4 {}", out[400]);
         assert!(out.iter().all(|s| s.is_finite()));
+    }
+
+    #[test]
+    fn delay_tap_reads_the_delayed_sample_without_advancing() {
+        // 0.01 s at 1 kHz is a 10-sample line.
+        let mut delay = Delay::new(1000.0, 0.03, 0.0);
+        delay.set_delay_secs(0.01);
+        assert_eq!(delay.tap(), 0.0, "empty line reads silence");
+        delay.process(1.0);
+        delay.process(0.5);
+        // Only two writes: the tap slot still holds silence.
+        assert_eq!(delay.tap(), 0.0);
+        for i in 0..12 {
+            delay.process(i as f32);
+        }
+        // 14 writes total (inputs 1.0, 0.5, then 0..11); the write head
+        // sits at ring index 4, so the tap holds the input of call #4,
+        // which was 2.0 — the sample written 10 calls ago.
+        assert_eq!(delay.tap(), 2.0, "tap holds the 10-sample-old input");
     }
 
     #[test]

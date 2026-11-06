@@ -24,18 +24,21 @@
 // fail even though none of today's implementations can, so clippy's
 // `unnecessary_wraps` is a planned false positive here.
 #![allow(clippy::unnecessary_wraps)]
-
 use crate::params::spec;
 use crate::params::{ParamSet, ParamSpec};
 use qinari_dsp::buffer::AudioBuffer;
-use qinari_dsp::env::{Adsr, Percussive};
+use qinari_dsp::env::{friedlander, Adsr, Percussive, Segment, SegmentShape, SegmentSpec};
+use qinari_dsp::events::{cox_events, renewal_events};
 use qinari_dsp::filter::{Biquad, BiquadKind, Svf};
 use qinari_dsp::fx::{Crush, Drive, Tremolo};
-use qinari_dsp::lfo::{Lfo, LfoShape};
-use qinari_dsp::noise::{noise_burst, swept_noise, NoiseGen, NoiseKind};
+use qinari_dsp::latent::LatentField;
+use qinari_dsp::noise::{
+    band_limited_gaussian, noise_burst, noise_burst_attacked, swept_noise, NoiseGen, NoiseKind,
+};
 use qinari_dsp::osc::{fast_sine, Osc, OscKind};
 use qinari_dsp::pan::pan;
 use qinari_dsp::rng::{Qrng, Seed};
+use qinari_dsp::spatial::{decorrelate, DistanceFilter, EarlyReflections};
 use strsim::levenshtein;
 
 /// Butterworth quality for standard 2nd-order designs.
@@ -178,22 +181,52 @@ pub fn ping(rng: &mut Qrng, sr: f32, freq: f32, t60: f32) -> Vec<f32> {
 ///
 /// `rate_per_sec` is the expected event count per second; the process is
 /// memoryless, so a render's events depend only on `rng`. A non-positive
-/// rate yields no events.
+/// rate yields no events. Kept for the genuinely high-rate streams
+/// (`RESEARCH-AUDIO-REALISM.md` §R 2.4); clustered and drift-coupled
+/// fields use the renewal and Cox processes in `qinari_dsp::events`.
 pub fn poisson_events(rng: &mut Qrng, frames: usize, sr: u32, rate_per_sec: f32) -> Vec<usize> {
-    let mut events = Vec::new();
-    if rate_per_sec <= 0.0 || frames == 0 {
-        return events;
-    }
-    let mean_gap = sr as f32 / rate_per_sec;
-    let mut cursor = 0.0f32;
-    while cursor < frames as f32 {
-        // 1 - next_f32 lies in (0, 1]; ln(1) = 0 can stack two events on
-        // the same frame, which the accumulator simply sums.
-        let draw = 1.0 - rng.next_f32();
-        events.push(cursor as usize);
-        cursor += -draw.ln() * mean_gap;
-    }
-    events
+    qinari_dsp::events::poisson_events(rng, frames, sr, rate_per_sec)
+}
+
+/// Clamps a latent-field reading into `0..1` for depth modulation.
+///
+/// Fields are calibrated so ±1σ lands on the span edges; readings can
+/// exceed them (as in any Gaussian process), and depths must stay in
+/// range.
+fn unit_depth(field_value: f32) -> f32 {
+    field_value.clamp(0.0, 1.0)
+}
+
+/// Builds the shared latent field for one bed render.
+///
+/// Every layer of the recipe (bed gain, cutoffs, gust depth, event
+/// rate) reads THIS field, so cross-band envelope correlation and
+/// event/bed co-variation exist by construction
+/// (`DESIGN-REALISM-ENGINE.md` §7). The span is `0..1` (the ±1σ range
+/// of the calibrated field).
+fn bed_latent(recipe: &str, ctx: &RenderContext, corner_hz: f32) -> LatentField {
+    LatentField::new(
+        &mut tagged_rng(recipe, "latent", ctx),
+        ctx.sr as f32,
+        ctx.frames,
+        corner_hz,
+        0.0,
+        1.0,
+    )
+}
+
+/// Builds a tilted variant of the shared latent for recipes whose
+/// motion carries mid-band turbulence (wind wander, fire flicker).
+fn bed_latent_tilted(recipe: &str, ctx: &RenderContext, corner_hz: f32, tilt: f32) -> LatentField {
+    LatentField::tilted(
+        &mut tagged_rng(recipe, "latent", ctx),
+        ctx.sr as f32,
+        ctx.frames,
+        corner_hz,
+        tilt,
+        0.0,
+        1.0,
+    )
 }
 
 /// Clamps a design frequency into the DSP Nyquist guard band.
@@ -278,54 +311,86 @@ static RAIN_PARAMS: &[ParamSpec] = &[
     ),
 ];
 
+/// Renders a sine ping with a short linear attack ramp before the T60
+/// decay — the transient shape real droplet onsets carry
+/// (`RESEARCH-AUDIO-REALISM.md` §R 2.2).
+pub fn ping_attacked(rng: &mut Qrng, sr: f32, freq: f32, t60: f32, attack_secs: f32) -> Vec<f32> {
+    let mut osc = Osc::new(OscKind::Sine, guard_hz(freq, sr), sr, rng);
+    let tau = t60 / 6.91;
+    let mut env = Percussive::shaped(sr, attack_secs, tau, tau, 0.5);
+    env.trigger();
+    let frames = ((1.2 * t60 * sr).ceil() as usize).max(4);
+    (0..frames).map(|_| osc.process() * env.process()).collect()
+}
+
 fn render_rain(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let sr = ctx.sr as f32;
     let intensity = ctx.params.get("intensity") as f32;
     let distance = ctx.params.get("distance") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Bed: pink noise shaped by the plan's cutoffs, breathing with a
-    // 0.07 Hz gust.
+    // One latent field drives the bed gain, the bed cutoff and the
+    // droplet rate together (replaces the old 0.07 Hz gust sinusoid and
+    // the independent Poisson stream).
+    let latent = bed_latent("rain", ctx, 0.18);
+
+    // Bed: pink noise shaped by the plan's cutoffs, breathing on the
+    // shared field.
     let bed_cutoff = (1500.0 + 6500.0 * intensity - 1200.0 * distance).clamp(220.0, 9000.0);
     let hp_cutoff = (400.0 - 250.0 * distance).clamp(60.0, 600.0);
     let bed_level = 0.06 + 0.14 * intensity;
     let mut bed = NoiseGen::new(NoiseKind::Pink, tagged_rng("rain", "bed", ctx));
-    let mut bed_lowpass = Biquad::design(BiquadKind::Lowpass, sr, bed_cutoff, BUTTERWORTH, 0.0);
+    // Svf for the lowpass: the corner breathes with the field, and only
+    // the TPT core retunes without state discontinuities.
+    let mut bed_lowpass = Svf::new(sr, bed_cutoff, BUTTERWORTH);
     let mut bed_highpass = Biquad::design(BiquadKind::Highpass, sr, hp_cutoff, BUTTERWORTH, 0.0);
     let bed_samples: Vec<f32> = (0..ctx.frames)
         .map(|frame| {
-            let t = frame as f32 / sr;
-            let gust = 0.8 + 0.45 * (0.5 + 0.5 * fast_sine(0.07 * t));
-            bed_highpass.process(bed_lowpass.process(bed.process())) * bed_level * gust
+            let depth = unit_depth(latent.value_at(frame));
+            let gust = 0.8 + 0.45 * depth;
+            // The cutoff breathes on the same field (±12%), so the
+            // bands co-vary by construction.
+            let breathe = 1.0 + 0.12 * (depth - 0.5);
+            bed_lowpass.set(sr, bed_cutoff * breathe, BUTTERWORTH);
+            bed_highpass.process(bed_lowpass.process(bed.process()).low) * bed_level * gust
         })
         .collect();
     bus.add_panned(0, 0.0, &bed_samples);
 
-    // Droplets: Poisson pings panned across the field, some heavy.
+    // Droplets: a Cox process whose rate rides the same field — the
+    // shower thickens with the gusts. Panned across the field, some
+    // heavy.
     let mut drops = tagged_rng("rain", "drops", ctx);
-    let events = poisson_events(&mut drops, ctx.frames, ctx.sr, 18.0 + 95.0 * intensity);
+    let mean_rate = 18.0 + 95.0 * intensity;
+    let events = cox_events(&mut drops, ctx.frames, ctx.sr, mean_rate, |frame| {
+        0.35 + 1.4 * unit_depth(latent.value_at(frame))
+    });
     let attenuation = 1.0 - 0.55 * distance;
     for &at in &events {
         let heavy = drops.next_f32() < 0.08;
-        let (freq, t60, level) = if heavy {
+        let (freq, t60, level, attack) = if heavy {
             (
                 900.0 + drops.next_f32() * 700.0,
                 0.1 + drops.next_f32() * 0.05,
                 0.09 + drops.next_f32() * 0.08,
+                0.0012,
             )
         } else {
             (
                 2200.0 + drops.next_f32() * 4500.0,
                 0.035 + drops.next_f32() * 0.075,
                 0.02 + drops.next_f32() * 0.07,
+                0.0006,
             )
         };
         let pos = drops.next_range(-0.85, 0.85);
-        let drop = ping(&mut drops, sr, freq, t60);
+        let drop = ping_attacked(&mut drops, sr, freq, t60, attack);
         add_layer(&mut bus, at, &drop, level * attenuation, pos, pos);
     }
 
     let mut out = bus.buffer();
+    // Bed decorrelation: shared below 500 Hz, independent above.
+    decorrelate(&mut out, 500.0, sr, &mut tagged_rng("rain", "decor", ctx));
     fade_edges(&mut out, ctx.sr, 120.0, 120.0);
     Ok(out)
 }
@@ -344,36 +409,41 @@ fn render_wind(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let intensity = ctx.params.get("intensity") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Body: a wandering lowpass band, gusting at 0.11 Hz.
+    // One tilted latent drives the band wander, the gust gain and the
+    // whistle together (tilt: wind turbulence carries mid-band energy;
+    // the old 0.06/0.11/0.045 Hz sinusoids are gone).
+    let latent = bed_latent_tilted("wind", ctx, 0.12, 0.55);
+
+    // Body: a wandering lowpass band whose centre and gain ride the
+    // shared field.
     let body_level = 0.05 + 0.16 * intensity;
     let mut body = NoiseGen::new(NoiseKind::Pink, tagged_rng("wind", "body", ctx));
     let mut body_svf = Svf::new(sr, 700.0, 1.1);
     let body_samples: Vec<f32> = (0..ctx.frames)
         .map(|frame| {
-            let t = frame as f32 / sr;
-            let wander = 0.5 + 0.5 * fast_sine(0.06 * t);
-            body_svf.set(sr, 450.0 + 800.0 * intensity * wander, 1.1);
-            let gust = 0.65 + 0.35 * (0.5 + 0.5 * fast_sine(0.11 * t + 1.3));
+            let depth = unit_depth(latent.value_at(frame));
+            body_svf.set(sr, 450.0 + 800.0 * intensity * depth, 1.1);
+            let gust = 0.65 + 0.35 * depth;
             body_svf.process(body.process()).low * body_level * gust
         })
         .collect();
     bus.add_panned(0, 0.0, &body_samples);
 
-    // Whistle: a resonant band riding above the body.
+    // Whistle: a resonant band riding above the body on the same field.
     let whistle_level = 0.012 + 0.05 * intensity;
     let mut whistle = NoiseGen::new(NoiseKind::White, tagged_rng("wind", "whistle", ctx));
     let mut whistle_svf = Svf::new(sr, 1600.0, 4.0);
     let whistle_samples: Vec<f32> = (0..ctx.frames)
         .map(|frame| {
-            let t = frame as f32 / sr;
-            let wander = 0.5 + 0.5 * fast_sine(0.045 * t + 0.7);
-            whistle_svf.set(sr, 1300.0 + 900.0 * intensity * wander, 4.0);
+            let depth = unit_depth(latent.value_at(frame));
+            whistle_svf.set(sr, 1300.0 + 900.0 * intensity * depth, 4.0);
             whistle_svf.process(whistle.process()).band * whistle_level
         })
         .collect();
     bus.add_panned(0, 0.0, &whistle_samples);
 
     let mut out = bus.buffer();
+    decorrelate(&mut out, 500.0, sr, &mut tagged_rng("wind", "decor", ctx));
     fade_edges(&mut out, ctx.sr, 150.0, 150.0);
     Ok(out)
 }
@@ -387,12 +457,54 @@ static THUNDER_PARAMS: &[ParamSpec] = &[spec!(
     "Distance to the strike; softens the crack and lengthens the rumble."
 )];
 
+/// The thunder rumble bed: a fractal (α≈2) bed below 300 Hz that decays
+/// with the last arrival, its tail breathing on a latent field.
+fn thunder_rumble(ctx: &RenderContext, sr: f32, distance: f32) -> Vec<f32> {
+    let rumble_t60 = 1.6 + 1.4 * distance;
+    let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
+    let onset_tau = 0.12 + 0.5 * distance;
+    let tail = bed_latent("thunder", ctx, 0.3);
+    let mut source = NoiseGen::fractal(2.0, tagged_rng("thunder", "rumble", ctx));
+    let mut lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
+    let mut highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
+    let mut decay_shape = Percussive::from_t60(sr, rumble_t60);
+    decay_shape.trigger();
+    (0..rumble_frames)
+        .map(|frame| {
+            let t = frame as f32 / sr;
+            let onset = 1.0 - (-t / onset_tau).exp();
+            let breathe = 0.75 + 0.5 * unit_depth(tail.value_at(frame));
+            lowpass.process(highpass.process(source.process()))
+                * decay_shape.process()
+                * onset
+                * breathe
+                * (0.5 - 0.3 * distance)
+        })
+        .collect()
+}
+
 fn render_thunder(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let sr = ctx.sr as f32;
     let distance = ctx.params.get("distance") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Sub thump under everything.
+    // The tortuous-channel model (Roy 1980 via §R 2.3): a strike is not
+    // one crack but 4-8 arrivals from channel segments at different
+    // distances, spread over seconds — the spread grows with distance.
+    let mut arrivals_rng = tagged_rng("thunder", "arrivals", ctx);
+    let count = 4 + arrivals_rng.next_int_range(0, 4) as usize;
+    let spread = 1.0 + 4.0 * distance;
+    let mut gaps: Vec<f32> = (0..count.saturating_sub(1))
+        .map(|_| 0.25 + arrivals_rng.next_f32() * 1.75)
+        .collect();
+    let gap_sum: f32 = gaps.iter().sum();
+    if gap_sum > 0.0 {
+        for gap in &mut gaps {
+            *gap *= spread / gap_sum;
+        }
+    }
+
+    // Sub thump under the first arrival.
     let sub = sub_sweep(
         &mut tagged_rng("thunder", "sub", ctx),
         sr,
@@ -403,55 +515,74 @@ fn render_thunder(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     );
     add_layer(&mut bus, 0, &sub, 0.4, 0.0, 0.0);
 
-    // The crack: bright up close, dull and stretched when far.
-    let crack_cutoff = (2800.0 * (1.0 - 0.6 * distance) + 400.0).clamp(500.0, 3200.0);
-    let crack = noise_burst(
-        sr,
-        &mut tagged_rng("thunder", "crack", ctx),
-        crack_cutoff,
-        0.02 + 0.02 * (1.0 - distance),
-    );
-    add_layer(&mut bus, 0, &crack, 0.9 - 0.55 * distance, -0.1, 0.15);
+    // One clap shape shared by the arrivals, scaled per arrival.
+    let clap_specs = [
+        SegmentSpec {
+            target: 1.0,
+            secs: 0.008,
+            shape: SegmentShape::Linear,
+        },
+        SegmentSpec {
+            target: 0.55,
+            secs: 0.3,
+            shape: SegmentShape::Smooth,
+        },
+        SegmentSpec {
+            target: 0.0,
+            secs: 0.7,
+            shape: SegmentShape::Linear,
+        },
+    ];
+    let mut clap_env = Segment::new(&clap_specs, sr);
+    let clap_frames = (clap_env.total_secs(sr) * sr) as usize;
 
-    // Rumble: a lowpassed pink bed that builds slowly when far.
-    let rumble_t60 = 1.6 + 1.4 * distance;
-    let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
-    let onset_tau = 0.12 + 0.5 * distance;
-    let mut rumble_gen = NoiseGen::new(NoiseKind::Pink, tagged_rng("thunder", "rumble", ctx));
-    let mut rumble_lp = Biquad::design(
-        BiquadKind::Lowpass,
-        sr,
-        (300.0 - 220.0 * distance).clamp(80.0, 300.0),
-        BUTTERWORTH,
-        0.0,
-    );
-    let mut rumble_env = Percussive::from_t60(sr, rumble_t60);
-    rumble_env.trigger();
-    let rumble: Vec<f32> = (0..rumble_frames)
-        .map(|frame| {
-            let t = frame as f32 / sr;
-            let onset = 1.0 - (-t / onset_tau).exp();
-            rumble_lp.process(rumble_gen.process())
-                * rumble_env.process()
-                * onset
-                * (0.5 - 0.3 * distance)
-        })
-        .collect();
+    let mut at = 0usize;
+    for arrival in 0..count {
+        // Later arrivals come from farther along the channel: distance
+        // and therefore attenuation grow with the arrival index.
+        let arrival_distance =
+            (distance + (arrival as f32 / count as f32) * 0.45 + arrivals_rng.next_f32() * 0.1)
+                .clamp(0.0, 1.0);
+        let atten = 1.0 / (1.0 + 4.0 * arrival_distance);
+        let loudness = 0.7 + 0.3 * arrivals_rng.next_f32();
+
+        // Clap body: clap energy concentrates below ~300 Hz (Bodhika
+        // 2019 via §R 2.3).
+        let clap = band_limited_gaussian(sr, &mut arrivals_rng, 25.0, 280.0, clap_frames);
+        clap_env.trigger();
+        let shaped: Vec<f32> = clap.iter().map(|s| s * clap_env.process()).collect();
+        let pan = arrivals_rng.next_range(-0.25, 0.25);
+        add_layer(&mut bus, at, &shaped, atten * loudness, pan, pan);
+
+        // Only the near field hears the HF crack of the first break.
+        if arrival == 0 && distance < 0.5 {
+            let crack_cutoff = (2800.0 * (1.0 - 0.6 * distance) + 400.0).clamp(500.0, 3200.0);
+            let crack = noise_burst_attacked(
+                sr,
+                &mut arrivals_rng,
+                crack_cutoff,
+                0.02 + 0.02 * (1.0 - distance),
+                0.0006,
+            );
+            add_layer(
+                &mut bus,
+                at,
+                &crack,
+                (0.9 - 0.9 * distance) * loudness,
+                pan,
+                pan,
+            );
+        }
+
+        if arrival < gaps.len() {
+            at += (gaps[arrival] * sr) as usize;
+        }
+    }
+
+    // Rumble: a fractal (α≈2) bed below 300 Hz that decays with the
+    // last arrival; its tail breathes on a latent field.
+    let rumble = thunder_rumble(ctx, sr, distance);
     add_layer(&mut bus, 0, &rumble, 1.0, 0.0, 0.0);
-
-    // One rolling echo down the tail.
-    let echo_t60 = 1.2;
-    let echo_frames = (1.2 * echo_t60 * sr) as usize;
-    let mut echo_gen = NoiseGen::new(NoiseKind::Pink, tagged_rng("thunder", "echo", ctx));
-    let mut echo_lp = Biquad::design(BiquadKind::Lowpass, sr, 120.0, BUTTERWORTH, 0.0);
-    let mut echo_env = Percussive::from_t60(sr, echo_t60);
-    echo_env.trigger();
-    let echo: Vec<f32> = (0..echo_frames)
-        .map(|_| {
-            echo_lp.process(echo_gen.process()) * echo_env.process() * 0.16 * (1.0 - 0.5 * distance)
-        })
-        .collect();
-    add_layer(&mut bus, (1.05 * sr) as usize, &echo, 1.0, 0.1, -0.1);
 
     let mut out = bus.buffer();
     fade_edges(&mut out, ctx.sr, 0.0, 10.0);
@@ -511,42 +642,49 @@ fn render_fire(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let intensity = ctx.params.get("intensity") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Hiss bed flickering at sample-and-hold rate.
+    // The fire's flare level: one tilted latent (corner ~1.4 Hz, tilt
+    // filling the flicker band) replaces the 0.8 Hz sample-and-hold.
+    let flare = bed_latent_tilted("fire", ctx, 1.4, 0.65);
+
+    // Hiss bed flickering on the flare field.
     let hiss_level = 0.015 + 0.05 * intensity;
     let mut hiss = NoiseGen::new(NoiseKind::Pink, tagged_rng("fire", "hiss", ctx));
     let mut hiss_hp = Biquad::design(BiquadKind::Highpass, sr, 1200.0, BUTTERWORTH, 0.0);
-    let mut flicker = Lfo::new(
-        LfoShape::SampleHold,
-        0.8,
-        sr,
-        &mut tagged_rng("fire", "flicker", ctx),
-    );
     let hiss_samples: Vec<f32> = (0..ctx.frames)
-        .map(|_| {
-            let jitter = 0.7 + 0.3 * (0.5 + 0.5 * flicker.process());
+        .map(|frame| {
+            let jitter = 0.7 + 0.3 * unit_depth(flare.value_at(frame));
             hiss_hp.process(hiss.process()) * hiss_level * jitter
         })
         .collect();
     bus.add_panned(0, 0.0, &hiss_samples);
 
-    // Crackle ticks; a few of them pop loudly.
+    // Crackle ticks ride the flare as a Cox process — bursts cluster on
+    // the flare-ups. Attacked bursts carry a real onset.
     let mut crackle = tagged_rng("fire", "crackle", ctx);
-    let tick_events = poisson_events(&mut crackle, ctx.frames, ctx.sr, 6.0 + 42.0 * intensity);
+    let tick_events = cox_events(
+        &mut crackle,
+        ctx.frames,
+        ctx.sr,
+        6.0 + 42.0 * intensity,
+        |frame| 0.3 + 1.7 * unit_depth(flare.value_at(frame)),
+    );
     for &at in &tick_events {
         let cutoff = 2200.0 + crackle.next_f32() * 3800.0;
         let decay = 0.006 + crackle.next_f32() * 0.02;
-        let tick = noise_burst(sr, &mut crackle, cutoff, decay);
+        let attack = 0.0003 + crackle.next_f32() * 0.0005;
+        let tick = noise_burst_attacked(sr, &mut crackle, cutoff, decay, attack);
         let loud = crackle.next_f32();
         let pos = crackle.next_range(-0.8, 0.8);
         add_layer(&mut bus, at, &tick, 0.05 + 0.32 * loud * loud, pos, pos);
     }
 
-    // Deep pops from the coals.
-    let pop_events = poisson_events(&mut crackle, ctx.frames, ctx.sr, 0.7 + 1.3 * intensity);
+    // Deep pops from the coals: a renewal stream with a heavy tail
+    // (CV 1.6) — pops bunch up like real coal shifts.
+    let pop_events = renewal_events(&mut crackle, ctx.frames, ctx.sr, 0.7 + 1.3 * intensity, 1.6);
     for &at in &pop_events {
         let cutoff = 380.0 + crackle.next_f32() * 250.0;
         let decay = 0.04 + crackle.next_f32() * 0.03;
-        let pop = noise_burst(sr, &mut crackle, cutoff, decay);
+        let pop = noise_burst_attacked(sr, &mut crackle, cutoff, decay, 0.0015);
         let pos = crackle.next_range(-0.5, 0.5);
         add_layer(
             &mut bus,
@@ -559,6 +697,7 @@ fn render_fire(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     }
 
     let mut out = bus.buffer();
+    decorrelate(&mut out, 500.0, sr, &mut tagged_rng("fire", "decor", ctx));
     fade_edges(&mut out, ctx.sr, 100.0, 100.0);
     Ok(out)
 }
@@ -577,35 +716,49 @@ fn render_stream(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let intensity = ctx.params.get("intensity") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Burble: a resonant band whose centre wobbles on two slow rates.
+    // The flow surge: one tilted latent (the old 0.9 Hz and 0.23 Hz
+    // wobble sinusoids are gone) drives the burble centre, the bed
+    // level and the bubble rate together.
+    let flow = bed_latent_tilted("stream", ctx, 0.5, 0.7);
+
+    // Burble: a resonant band whose centre wanders on the flow field.
     let burble_level = 0.05 + 0.13 * intensity;
     let mut burble = NoiseGen::new(NoiseKind::White, tagged_rng("stream", "burble", ctx));
     let mut burble_svf = Svf::new(sr, 900.0, 2.8);
     let burble_samples: Vec<f32> = (0..ctx.frames)
         .map(|frame| {
-            let t = frame as f32 / sr;
-            let centre = 900.0 + 550.0 * fast_sine(0.9 * t) + 380.0 * fast_sine(0.23 * t);
-            burble_svf.set(sr, centre, 2.8);
+            let depth = unit_depth(flow.value_at(frame));
+            burble_svf.set(sr, 700.0 + 750.0 * depth, 2.8);
             burble_svf.process(burble.process()).band * burble_level
         })
         .collect();
     bus.add_panned(0, 0.0, &burble_samples);
 
-    // Body: a soft low bed underneath.
+    // Body: a soft low bed underneath, breathing on the same field.
     let mut body = NoiseGen::new(NoiseKind::Pink, tagged_rng("stream", "body", ctx));
     let mut body_lp = Biquad::design(BiquadKind::Lowpass, sr, 800.0, BUTTERWORTH, 0.0);
     let body_samples: Vec<f32> = (0..ctx.frames)
-        .map(|_| body_lp.process(body.process()) * 0.035)
+        .map(|frame| {
+            let depth = unit_depth(flow.value_at(frame));
+            body_lp.process(body.process()) * 0.035 * (0.7 + 0.6 * depth)
+        })
         .collect();
     bus.add_panned(0, 0.0, &body_samples);
 
-    // Bubbles: short pings scattered across the water.
+    // Bubbles: a Cox process on the flow field — bubble bursts cluster
+    // with the surges.
     let mut bubbles = tagged_rng("stream", "bubbles", ctx);
-    let events = poisson_events(&mut bubbles, ctx.frames, ctx.sr, 2.5 + 7.0 * intensity);
+    let events = cox_events(
+        &mut bubbles,
+        ctx.frames,
+        ctx.sr,
+        2.5 + 7.0 * intensity,
+        |frame| 0.3 + 1.5 * unit_depth(flow.value_at(frame)),
+    );
     for &at in &events {
         let freq = 700.0 + bubbles.next_f32() * 1900.0;
         let t60 = 0.05 + bubbles.next_f32() * 0.06;
-        let droplet = ping(&mut bubbles, sr, freq, t60);
+        let droplet = ping_attacked(&mut bubbles, sr, freq, t60, 0.0008);
         let pos = bubbles.next_range(-0.7, 0.7);
         add_layer(
             &mut bus,
@@ -618,6 +771,7 @@ fn render_stream(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     }
 
     let mut out = bus.buffer();
+    decorrelate(&mut out, 500.0, sr, &mut tagged_rng("stream", "decor", ctx));
     fade_edges(&mut out, ctx.sr, 120.0, 120.0);
     Ok(out)
 }
@@ -856,7 +1010,61 @@ fn render_explosion(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let distance = ctx.params.get("distance") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Sub boom: driven so it reads on small speakers.
+    // The physics-shaped event (§R 2.3): sub-ms shock front, Friedlander
+    // body with its rarefaction (negative) phase, 2-4 distance-scaled
+    // ground-reflection taps, air absorption over the propagation
+    // distance, and a fractal rumble whose tail rides a latent field.
+    // `size` maps to peak pressure and low-frequency proportion;
+    // `distance` maps to t*, tap delays and absorption.
+    let t_star = 0.06 + 0.42 * distance + 0.12 * size;
+    let peak_pressure = 0.9 - 0.35 * distance;
+
+    // Direct path assembled in mono, then shaped by the environment.
+    let mut event_rng = tagged_rng("explosion", "event", ctx);
+    let body_frames = ((4.5 * t_star) * sr).ceil() as usize;
+    let mut event = vec![0.0f32; body_frames];
+
+    // 1. Shock front: sub-ms broadband click, hard onset.
+    let shock_cutoff = (8000.0 - 5000.0 * distance + 2000.0 * size).clamp(1500.0, 9000.0);
+    let shock = noise_burst_attacked(sr, &mut event_rng, shock_cutoff, 0.006, 0.0004);
+    for (slot, &sample) in event.iter_mut().zip(shock.iter()) {
+        *slot += sample * peak_pressure;
+    }
+
+    // 2. Friedlander body: the bipolar P(t) shapes a band-limited
+    // Gaussian carrier; the negative lobe is physical, not decorative.
+    let body_cutoff = (1600.0 * (1.0 - 0.55 * distance) + 900.0 * size).clamp(300.0, 6000.0);
+    let body = band_limited_gaussian(sr, &mut event_rng, 30.0, body_cutoff, body_frames);
+    for (n, slot) in event.iter_mut().enumerate() {
+        let t = n as f32 / sr;
+        *slot += body[n] * friedlander(t, t_star) * peak_pressure * 1.4;
+    }
+
+    // 3. Ground reflections (Mach-stem sum): 2-4 taps at
+    // distance-scaled delays with falling gains.
+    let tap_count = 2 + event_rng.next_int_range(0, 2) as usize;
+    let mut taps: Vec<(f32, f32)> = Vec::with_capacity(tap_count);
+    let tap_base = 0.018 + 0.06 * distance;
+    for tap in 0..tap_count {
+        let delay = tap_base * (1.0 + tap as f32) * (0.8 + 0.4 * event_rng.next_f32());
+        let gain = 0.45 * 0.6_f32.powi(tap as i32) * (1.0 - 0.4 * distance);
+        taps.push((delay, gain));
+    }
+    let mut reflections = EarlyReflections::new(sr, &taps);
+    for slot in &mut event {
+        *slot = reflections.process(*slot);
+    }
+
+    // 4. Air absorption + propagation: delay, 1/d gain and HF rolloff
+    // over the source distance (8 m near field to 60 m at distance 1).
+    let mut air = DistanceFilter::from_meters(sr, 8.0 + 52.0 * distance);
+    for slot in &mut event {
+        *slot = air.process(*slot);
+    }
+    add_layer(&mut bus, 0, &event, 1.0, 0.0, 0.1);
+
+    // 5. Sub boom: driven so it reads on small speakers (kept from the
+    // classic recipe; the size-dependent LF proportion).
     let mut drive = Drive::new(2.0);
     let boom: Vec<f32> = sub_sweep(
         &mut tagged_rng("explosion", "boom", ctx),
@@ -871,51 +1079,39 @@ fn render_explosion(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     .collect();
     add_layer(&mut bus, 0, &boom, 1.0, 0.0, 0.0);
 
-    // Blast: the broadband body of the event.
-    let blast_cutoff = (1400.0 * (1.0 - 0.55 * distance) + 900.0 * size).clamp(300.0, 6000.0);
-    let blast = noise_burst(
-        sr,
-        &mut tagged_rng("explosion", "blast", ctx),
-        blast_cutoff,
-        0.22 + 0.25 * size + 0.15 * distance,
-    );
-    add_layer(&mut bus, 0, &blast, 0.85 - 0.35 * distance, 0.0, 0.1);
-
-    // Rumble: slow onset, long tail.
+    // 6. Rumble: fractal (α≈2) bed band-limited to 30-300 Hz, onset
+    // locked to the body, tail driven by the latent field.
     let rumble_t60 = 1.0 + 1.8 * size + 0.8 * distance;
     let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
-    let mut rumble_gen = NoiseGen::new(NoiseKind::Pink, tagged_rng("explosion", "rumble", ctx));
-    let mut rumble_lp = Biquad::design(
-        BiquadKind::Lowpass,
-        sr,
-        (260.0 - 180.0 * distance).clamp(60.0, 300.0),
-        BUTTERWORTH,
-        0.0,
-    );
-    let mut rumble_env = Percussive::from_t60(sr, rumble_t60);
-    rumble_env.trigger();
+    let tail = bed_latent("explosion", ctx, 0.25);
+    let mut blast_source = NoiseGen::fractal(2.0, tagged_rng("explosion", "rumble", ctx));
+    let mut blast_lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
+    let mut blast_highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
+    let mut blast_shape = Percussive::shaped(sr, 0.02, rumble_t60 / 6.91, rumble_t60 / 3.0, 0.35);
+    blast_shape.trigger();
     let rumble: Vec<f32> = (0..rumble_frames)
         .map(|frame| {
-            let t = frame as f32 / sr;
-            let onset = 1.0 - (-t / (0.15 + 0.4 * distance)).exp();
-            rumble_lp.process(rumble_gen.process())
-                * rumble_env.process()
-                * onset
+            let breathe = 0.7 + 0.5 * unit_depth(tail.value_at(frame));
+            blast_lowpass.process(blast_highpass.process(blast_source.process()))
+                * blast_shape.process()
+                * breathe
                 * (0.3 + 0.2 * size - 0.15 * distance)
         })
         .collect();
     add_layer(&mut bus, 0, &rumble, 1.0, 0.0, 0.0);
 
-    // Debris: ticks scattering after the blast.
-    let debris_frames = (1.4 * sr) as usize;
+    // 7. Debris: ticks scattering after the blast (past the body, so
+    // the negative-phase window stays clean), distance-attenuated.
+    let debris_frames = (1.6 * sr) as usize;
     let rate = ((4.0 + 10.0 * size) * (1.0 - 0.6 * distance)).max(0.5);
     let mut debris = tagged_rng("explosion", "debris", ctx);
     let events = poisson_events(&mut debris, debris_frames, ctx.sr, rate);
     for &event_at in &events {
-        let at = (0.35 * sr) as usize + event_at;
+        let at = (0.5 * sr) as usize + event_at;
         let cutoff = 2500.0 + debris.next_f32() * 4500.0;
         let decay = 0.02 + debris.next_f32() * 0.03;
-        let tick = noise_burst(sr, &mut debris, cutoff, decay);
+        let attack = 0.0004 + debris.next_f32() * 0.0012;
+        let tick = noise_burst_attacked(sr, &mut debris, cutoff, decay, attack);
         let pos = debris.next_range(-0.8, 0.8);
         let level = (0.05 + 0.2 * debris.next_f32()) * (1.0 - 0.5 * distance);
         add_layer(&mut bus, at, &tick, level, pos, pos);

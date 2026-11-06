@@ -14,17 +14,26 @@
 //! reverb / dynamics / waveshaping effects, [`karplus`] plucked-string
 //! synthesis, [`lufs`] ITU-R BS.1770-4 loudness measurement, and [`dither`]
 //! requantizer dither with noise shaping.
+//!
+//! Realism-oriented layers: [`latent`] provides the one shared slow
+//! stochastic process a whole render breathes on, [`events`] the renewal
+//! and Cox event processes beyond memoryless Poisson, [`spatial`] bed
+//! decorrelation / distance / early-reflection helpers, and [`modal`]
+//! modal resonator banks for struck objects.
 
 pub mod analysis;
 pub mod buffer;
 pub mod dither;
 pub mod env;
+pub mod events;
 pub mod filter;
 pub mod fx;
 pub mod karplus;
+pub mod latent;
 pub mod lfo;
 pub mod lufs;
 pub mod noise;
 pub mod osc;
 pub mod pan;
 pub mod rng;
+pub mod spatial;

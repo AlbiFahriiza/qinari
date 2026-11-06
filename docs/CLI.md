@@ -48,7 +48,7 @@ Render a procedural sound effect.
 
 | Option | Effect |
 | --- | --- |
-| `--list` | List all recipes (29) and exit. |
+| `--list` | List all recipes (30) and exit. |
 | `-o`, `--out <FILE>` | Output path (`.wav`/`.mp3`). Default: `out.wav` (batch runs: `out-000.wav`, `out-001.wav`, …). |
 | `-d`, `--duration <T>` | `3` by default. Bare seconds or `ms`/`s`/`m`/`h` units. |
 | `--seed <TEXT>` | Any text; same seed = bit-identical output. Default: time-based. |
@@ -60,7 +60,7 @@ Render a procedural sound effect.
 Recipes: `rain wind thunder ocean fire stream explosion impact whoosh
 sword laser blaster teleport forcefield robot_talk ui_success ui_error
 ui_click sonar alarm engine glitch riser hit sub_drop heartbeat
-footsteps spell_cast crickets`.
+footsteps spell_cast crickets birdsong`.
 
 Example:
 

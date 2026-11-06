@@ -11,9 +11,9 @@ use qinari_sfx::{
 const SR: u32 = 48_000;
 const LOW_SR: u32 = 8_000;
 
-/// The 29 catalog ids in canonical order; the count and spelling are part
+/// The 30 catalog ids in canonical order; the count and spelling are part
 /// of the public interface.
-const EXPECTED_IDS: [&str; 29] = [
+const EXPECTED_IDS: [&str; 30] = [
     "rain",
     "wind",
     "thunder",
@@ -43,6 +43,7 @@ const EXPECTED_IDS: [&str; 29] = [
     "footsteps",
     "spell_cast",
     "crickets",
+    "birdsong",
 ];
 
 fn request(recipe: &str, params: &[(&str, f64)]) -> RenderRequest {
@@ -74,8 +75,8 @@ fn bits_equal(a: &AudioBuffer, b: &AudioBuffer) -> bool {
 }
 
 #[test]
-fn catalog_lists_exactly_the_29_planned_ids() {
-    assert_eq!(recipes().len(), 29);
+fn catalog_lists_exactly_the_30_planned_ids() {
+    assert_eq!(recipes().len(), 30);
     let ids: Vec<&str> = recipes().iter().map(|recipe| recipe.id).collect();
     assert_eq!(ids, EXPECTED_IDS);
     let descriptions = recipes()
@@ -168,6 +169,23 @@ fn parameters_change_the_render() {
     let slow = render(&request("footsteps", &[("rate", 0.6)])).unwrap();
     let fast = render(&request("footsteps", &[("rate", 3.5)])).unwrap();
     assert!(fast.rms() > slow.rms(), "step rate did not raise energy");
+}
+
+#[test]
+fn birdsong_activity_changes_the_field_energy() {
+    let mut req = request("birdsong", &[("activity", 0.05)]);
+    req.duration_secs = 10.0;
+    let quiet = render(&req).unwrap();
+    let mut req = request("birdsong", &[("activity", 1.0)]);
+    req.duration_secs = 10.0;
+    let busy = render(&req).unwrap();
+    // A busy field clearly carries more song than a near-silent one.
+    assert!(
+        busy.rms() > 1.5 * quiet.rms(),
+        "quiet {} vs busy {}",
+        quiet.rms(),
+        busy.rms()
+    );
 }
 
 #[test]

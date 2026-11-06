@@ -7,7 +7,7 @@ qinari/
 ├── crates/
 │   ├── qinari-dsp/     # synthesis, filters, effects, analysis primitives
 │   ├── qinari-audio/   # containers (wav/mp3), resampling, mastering
-│   ├── qinari-sfx/     # 29 procedural recipes + ambient presets
+│   ├── qinari-sfx/     # 30 procedural recipes + ambient presets
 │   ├── qinari-music/   # algorithmic composer, 5 styles
 │   ├── qinari-tts/     # local ONNX VITS + OpenAI-compatible cloud
 │   └── qinari-cli/     # the `qinari` binary: setup, doctor, commands

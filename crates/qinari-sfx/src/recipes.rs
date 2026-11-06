@@ -1,4 +1,4 @@
-//! The 29 procedural sound-effect recipes.
+//! The 30 procedural sound-effect recipes.
 //!
 //! Every recipe is a pure function of a [`RenderContext`]: the validated
 //! parameters, the sample rate, the channel count, the frame count, and a
@@ -19,7 +19,7 @@
 //! ...) place their event at frame 0 and let the bus truncate whatever
 //! runs past the requested length.
 
-// The 29 render functions match the `Recipe::render` fn-pointer type whose
+// The 30 render functions match the `Recipe::render` fn-pointer type whose
 // `Result` return is part of the crate contract: recipes are allowed to
 // fail even though none of today's implementations can, so clippy's
 // `unnecessary_wraps` is a planned false positive here.
@@ -654,6 +654,180 @@ fn render_crickets(ctx: &RenderContext) -> Result<AudioBuffer, String> {
 
     let mut out = bus.buffer();
     fade_edges(&mut out, ctx.sr, 100.0, 100.0);
+    Ok(out)
+}
+
+static BIRDSONG_PARAMS: &[ParamSpec] = &[
+    spec!(
+        activity,
+        Float,
+        0.6,
+        0.0,
+        1.0,
+        "How busy the field is; sets the phrase rate."
+    ),
+    spec!(
+        variety,
+        Float,
+        0.5,
+        0.0,
+        1.0,
+        "How many distinct songs share the field."
+    ),
+];
+
+/// Shape of one song note: an exponential pitch glide from `f0` to `f1`
+/// under a T60 envelope, with optional vibrato layered on top (`vib_depth`
+/// is fractional pitch wobble).
+struct BirdNote {
+    f0: f32,
+    f1: f32,
+    dur: f32,
+    t60: f32,
+    vib_hz: f32,
+    vib_depth: f32,
+}
+
+/// Renders one song note as a pitch-gliding sine under a T60 envelope.
+fn bird_note(rng: &mut Qrng, sr: f32, spec: &BirdNote) -> Vec<f32> {
+    let two_pi = 2.0 * std::f32::consts::PI;
+    let mut osc = Osc::new(OscKind::Sine, guard_hz(spec.f0, sr), sr, rng);
+    let mut env = Percussive::from_t60(sr, spec.t60);
+    env.trigger();
+    let frames = ((spec.dur.max(1.2 * spec.t60) * sr).ceil() as usize).max(4);
+    let ratio = spec.f1 / spec.f0;
+    (0..frames)
+        .map(|i| {
+            let t = i as f32 / sr;
+            let glide = spec.f0 * ratio.powf(t / spec.dur);
+            let wobble = 1.0 + spec.vib_depth * (two_pi * spec.vib_hz * t).sin();
+            osc.set_freq(guard_hz(glide * wobble, sr));
+            osc.process() * env.process()
+        })
+        .collect()
+}
+
+/// Builds one song motif: its note samples, the gap after each note, and
+/// its mix weight (trills read softer than staircase calls).
+fn song_motif(songs: &mut Qrng, sr: f32) -> (Vec<Vec<f32>>, Vec<usize>, f32) {
+    let kind = songs.next_f32();
+    let base = 2100.0 + songs.next_f32() * 2700.0;
+    let mut notes: Vec<Vec<f32>> = Vec::new();
+    let mut gaps: Vec<usize> = Vec::new();
+    let weight;
+    if kind < 0.38 {
+        // Staircase: 3-7 short rising glides, each a step higher.
+        weight = 1.0;
+        let steps = 3 + songs.next_int_range(0, 4) as usize;
+        for s in 0..steps {
+            let f0 = base * (1.0 + 0.14 * s as f32);
+            let f1 = f0 * (1.18 + songs.next_f32() * 0.55);
+            let dur = 0.05 + songs.next_f32() * 0.07;
+            let t60 = 0.07 + songs.next_f32() * 0.05;
+            notes.push(bird_note(
+                songs,
+                sr,
+                &BirdNote {
+                    f0,
+                    f1,
+                    dur,
+                    t60,
+                    vib_hz: 0.0,
+                    vib_depth: 0.0,
+                },
+            ));
+            gaps.push(((0.08 + songs.next_f32() * 0.1) * sr) as usize);
+        }
+    } else if kind < 0.7 {
+        // Trill: 10-24 fast ticks on a slowly rising pitch.
+        weight = 0.55;
+        let ticks = 10 + songs.next_int_range(0, 14) as usize;
+        let step = 55.0 + songs.next_f32() * 110.0;
+        for s in 0..ticks {
+            let f0 = base + step * s as f32;
+            let f1 = f0 * (1.1 + songs.next_f32() * 0.18);
+            let dur = 0.026 + songs.next_f32() * 0.02;
+            let t60 = 0.03 + songs.next_f32() * 0.015;
+            notes.push(bird_note(
+                songs,
+                sr,
+                &BirdNote {
+                    f0,
+                    f1,
+                    dur,
+                    t60,
+                    vib_hz: 0.0,
+                    vib_depth: 0.0,
+                },
+            ));
+            gaps.push(((0.03 + songs.next_f32() * 0.025) * sr) as usize);
+        }
+    } else {
+        // Downslur call: 2-4 long falling notes with a soft vibrato.
+        weight = 0.8;
+        let calls = 2 + songs.next_int_range(0, 2) as usize;
+        for s in 0..calls {
+            let f0 = base * (1.0 - 0.18 * s as f32);
+            let f1 = f0 * (0.5 + songs.next_f32() * 0.28);
+            let dur = 0.16 + songs.next_f32() * 0.1;
+            let vib_hz = 16.0 + songs.next_f32() * 12.0;
+            notes.push(bird_note(
+                songs,
+                sr,
+                &BirdNote {
+                    f0,
+                    f1,
+                    dur,
+                    t60: 0.13,
+                    vib_hz,
+                    vib_depth: 0.02,
+                },
+            ));
+            gaps.push(((0.14 + songs.next_f32() * 0.1) * sr) as usize);
+        }
+    }
+    (notes, gaps, weight)
+}
+
+fn render_birdsong(ctx: &RenderContext) -> Result<AudioBuffer, String> {
+    let sr = ctx.sr as f32;
+    let activity = ctx.params.get("activity") as f32;
+    let variety = ctx.params.get("variety") as f32;
+    let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
+
+    // Songs: each motif is built once and reused verbatim — real birds
+    // repeat their tune, so the field hears a handful of distinct songs.
+    let mut songs = tagged_rng("birdsong", "songs", ctx);
+    let song_count = 1 + (variety * 5.0).round() as usize;
+    let mut motifs: Vec<(Vec<Vec<f32>>, Vec<usize>, f32)> = Vec::new();
+    for _ in 0..song_count {
+        motifs.push(song_motif(&mut songs, sr));
+    }
+
+    // Phrases: the field always opens with one phrase, then more bursts
+    // arrive as a Poisson stream; the singer drifts around the stereo
+    // field between phrases.
+    let mut field = tagged_rng("birdsong", "field", ctx);
+    let rate = 0.08 + 0.55 * activity;
+    let mut events = poisson_events(&mut field, ctx.frames, ctx.sr, rate);
+    let opening = (field.next_range(0.15, 0.85) * sr) as usize;
+    events.push(opening);
+    events.sort_unstable();
+    let mut pan = 0.0f32;
+    for &at in &events {
+        let pick = field.next_int_range(0, (motifs.len() - 1) as u64) as usize;
+        let (notes, gaps, weight) = &motifs[pick];
+        pan = (pan + field.next_range(-0.35, 0.35)).clamp(-0.8, 0.8);
+        let level = (0.11 + 0.1 * field.next_f32()) * weight;
+        let mut cursor = at;
+        for (note, gap) in notes.iter().zip(gaps) {
+            add_layer(&mut bus, cursor, note, level, pan, pan);
+            cursor += *gap;
+        }
+    }
+
+    let mut out = bus.buffer();
+    fade_edges(&mut out, ctx.sr, 120.0, 120.0);
     Ok(out)
 }
 
@@ -1724,7 +1898,7 @@ fn render_footsteps(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     Ok(out)
 }
 
-static RECIPES: [Recipe; 29] = [
+static RECIPES: [Recipe; 30] = [
     Recipe {
         id: "rain",
         description: "Steady rainfall: a gusty filtered bed with panned droplet pings.",
@@ -1899,6 +2073,12 @@ static RECIPES: [Recipe; 29] = [
         params: CRICKETS_PARAMS,
         render: render_crickets,
     },
+    Recipe {
+        id: "birdsong",
+        description: "Songbirds trade staircase chirps, trills and downslur calls across the field.",
+        params: BIRDSONG_PARAMS,
+        render: render_birdsong,
+    },
 ];
 
 #[cfg(test)]
@@ -2015,7 +2195,7 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), ids.len(), "duplicate recipe id");
-        assert_eq!(recipes().len(), 29);
+        assert_eq!(recipes().len(), 30);
         assert!(find_recipe("rain").is_some());
         assert!(find_recipe("nope").is_none());
     }

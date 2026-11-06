@@ -10,7 +10,7 @@ use predicates::prelude::*;
 use std::path::PathBuf;
 use std::process::Output;
 
-const ALL_RECIPES: [&str; 29] = [
+const ALL_RECIPES: [&str; 30] = [
     "rain",
     "wind",
     "thunder",
@@ -40,6 +40,7 @@ const ALL_RECIPES: [&str; 29] = [
     "footsteps",
     "spell_cast",
     "crickets",
+    "birdsong",
 ];
 
 const ALL_PRESETS: [&str; 5] = ["storm", "campfire", "ocean", "spaceship", "meadow"];
@@ -147,7 +148,7 @@ fn version_and_help_work() {
 }
 
 #[test]
-fn sfx_listing_shows_all_29_recipes_with_parameters() {
+fn sfx_listing_shows_all_30_recipes_with_parameters() {
     let sandbox = Sandbox::new("sfx-list");
     let output = sandbox.ok(&["sfx", "--list"]);
     let text = stdout(&output);

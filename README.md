@@ -18,8 +18,8 @@ $ qinari music synthwave -d 60s --seed nightdrive -o drive.mp3
 
 ## What it does
 
-- **29 sound-effect recipes** — rain, thunder, explosion, laser, sword,
-  footsteps, UI blips, and more — each with its own parameters
+- **30 sound-effect recipes** — rain, thunder, explosion, birdsong, laser,
+  sword, footsteps, UI blips, and more — each with its own parameters
   (`--set intensity=0.9`), rendered deterministically from a text seed.
 - **5 ambient beds** (storm, campfire, ocean, spaceship, meadow) up to
   an hour long.
@@ -65,7 +65,7 @@ cargo build --release --bin qinari
 ## Quick tour
 
 ```
-qinari sfx --list                    # all 29 recipes
+qinari sfx --list                    # all 30 recipes
 qinari sfx ui_success -d 500ms --seed chime
 qinari ambient storm -d 10m --seed night -o storm.wav
 qinari music lofi --bpm 82 -d 45s --seed café

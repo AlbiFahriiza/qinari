@@ -1,0 +1,20 @@
+{
+  "delegations": [
+    {
+      "id": "B3",
+      "task": "M8 criterion benches: dsp/sfx/music/audio, wired per-crate, gate-clean",
+      "subagent": "general-purpose",
+      "difficulty": "medium-high",
+      "fit": "Rust bench code against verified crate APIs; agent must read real sources before writing",
+      "gated": true
+    },
+    {
+      "id": "B4",
+      "task": "M8 Installer.sh + .github/workflows/release.yml (tag-driven, tarball+sha256 sidecar)",
+      "subagent": "general-purpose",
+      "difficulty": "medium",
+      "fit": "bash + GitHub Actions infra; shellcheck/bash -n gates available",
+      "gated": true
+    }
+  ]
+}

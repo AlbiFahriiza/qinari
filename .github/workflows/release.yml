@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+# The publish step needs write access to create the release and upload
+# assets; newer repositories default the token to read-only.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, smoke, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release binary
+        run: cargo build --release --bin qinari
+      - name: Smoke test
+        run: |
+          ./target/release/qinari --version
+          ./target/release/qinari sfx ui_success --duration 300ms --seed 1 --out /tmp/smoke.wav
+          ./target/release/qinari analyze /tmp/smoke.wav
+      - name: Package dist tarball
+        run: |
+          mkdir -p dist
+          cp target/release/qinari LICENSE README.md dist/
+          tar -czf dist/qinari-x86_64-unknown-linux-gnu.tar.gz \
+            -C dist qinari LICENSE README.md
+      - name: Generate and verify checksum
+        run: |
+          cd dist
+          sha256sum qinari-x86_64-unknown-linux-gnu.tar.gz \
+            > qinari-x86_64-unknown-linux-gnu.tar.gz.sha256
+          sha256sum --check qinari-x86_64-unknown-linux-gnu.tar.gz.sha256
+      - name: Publish GitHub release
+        # Manual dispatches run on a branch ref; only real tag pushes may
+        # publish, so test runs cannot create stray releases.
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/qinari-x86_64-unknown-linux-gnu.tar.gz
+            dist/qinari-x86_64-unknown-linux-gnu.tar.gz.sha256
+          body: |
+            Qinari ${{ github.ref_name }}
+
+            Prebuilt binary for x86_64-unknown-linux-gnu, bundled with
+            LICENSE and README.md. Verify the download against the
+            .sha256 sidecar before use:
+
+                sha256sum -c qinari-x86_64-unknown-linux-gnu.tar.gz.sha256

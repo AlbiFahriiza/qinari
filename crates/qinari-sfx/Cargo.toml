@@ -14,3 +14,10 @@ workspace = true
 qinari-dsp = { path = "../qinari-dsp" }
 strsim = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "sfx"
+harness = false

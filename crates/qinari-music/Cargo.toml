@@ -13,3 +13,10 @@ workspace = true
 [dependencies]
 qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "music"
+harness = false

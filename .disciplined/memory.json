@@ -120,6 +120,16 @@
       "rule": "DEP-UNKNOWN-IMPORT",
       "severity": "LOCK"
     },
+    "5d7e95131894bfd2": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-06T04:39:38+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-music/benches/music.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "BLOCK"
+    },
     "60ed2e9e5beb0720": {
       "acked": false,
       "count": 7,
@@ -220,6 +230,16 @@
       "rule": "DEP-UNKNOWN-IMPORT",
       "severity": "LOCK"
     },
+    "8599ac344acbd8d4": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-06T04:39:38+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
+      "norm_message": "import 'qinari_audio' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the regis",
+      "path": "crates/qinari-audio/benches/audio.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "BLOCK"
+    },
     "8769a570776f435a": {
       "acked": false,
       "count": 7,
@@ -298,6 +318,16 @@
       "norm_message": "comment restates or narrates the code; keep only the why",
       "path": "crates/qinari-tts/src/textnorm.rs",
       "rule": "COMMENT-RESTATES",
+      "severity": "LOCK"
+    },
+    "9cbe5803ad665088": {
+      "acked": false,
+      "count": 4,
+      "first_seen": "2026-11-06T04:32:35+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
+      "norm_message": "CI or hook configuration changed; do not edit checks to make a failing run pass, and tell the user why",
+      "path": ".github/workflows/release.yml",
+      "rule": "PROTECTED-FILE",
       "severity": "LOCK"
     },
     "a119e0285d71ef70": {
@@ -402,9 +432,9 @@
     },
     "d67e1832e4c6b6f4": {
       "acked": false,
-      "count": 6,
+      "count": 8,
       "first_seen": "2026-11-05T01:13:18+00:00",
-      "last_seen": "2026-11-05T01:14:43+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
       "norm_message": "# files and # changed lines; confirm every hunk is needed for the request",
       "path": ".disciplined/memory.json",
       "rule": "SCOPE-LARGE",
@@ -450,6 +480,16 @@
       "rule": "DEP-UNKNOWN-IMPORT",
       "severity": "LOCK"
     },
+    "f1af930113922020": {
+      "acked": false,
+      "count": 2,
+      "first_seen": "2026-11-06T04:39:38+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
+      "norm_message": "import 'qinari_sfx' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-sfx/benches/sfx.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
+      "severity": "BLOCK"
+    },
     "f1f8d0770245dbbc": {
       "acked": false,
       "count": 7,
@@ -458,6 +498,16 @@
       "norm_message": "function exceeds # lines \u2014 split it; find_recipe(): # lines, params=#, nesting=#, cyclomatic~#",
       "path": "crates/qinari-sfx/src/recipes.rs",
       "rule": "COMPLEXITY-FUNC-LINES",
+      "severity": "LOCK"
+    },
+    "f334d7424a0475e6": {
+      "acked": false,
+      "count": 4,
+      "first_seen": "2026-11-06T04:32:35+00:00",
+      "last_seen": "2026-11-06T04:39:47+00:00",
+      "norm_message": "import 'qinari_dsp' is not in the manifest, lockfile, stdlib or repo; AI models invent plausible package names (slopsquatting) \u2014 verify it exists in the registr",
+      "path": "crates/qinari-dsp/benches/dsp.rs",
+      "rule": "DEP-UNKNOWN-IMPORT",
       "severity": "LOCK"
     },
     "f39722d7d09bb87b": {
@@ -517,8 +567,8 @@
       "last": "2026-11-05T00:22:21+00:00"
     },
     "check_diff": {
-      "count": 12,
-      "last": "2026-11-05T01:14:43+00:00"
+      "count": 16,
+      "last": "2026-11-06T04:39:47+00:00"
     },
     "coverage_gate": {
       "count": 2,

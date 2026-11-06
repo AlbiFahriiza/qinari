@@ -22,7 +22,7 @@
       "subagent": "general-purpose",
       "difficulty": "high",
       "fit": "verification agent; must reproduce every gate itself and report raw outputs",
-      "gated": false
+      "gated": true
     },
     {
       "id": "V2",
@@ -30,7 +30,7 @@
       "subagent": "general-purpose",
       "difficulty": "high",
       "fit": "verification agent; runs documented commands against the binary and diffs claims vs code",
-      "gated": false
+      "gated": true
     }
   ]
 }

@@ -3,30 +3,20 @@
 STATUS BOARD (updated at each checkpoint):
 - M0 docs ✓ 9fb6724 | M1 scaffold ✓ 72b707d | M2 dsp ✓ 3de49b5
   (112 tests) | M3 audio ✓ ae24cf2 (31 tests) | M4 sfx + M5 music +
-  M6 tts ✓ 02956a8 — recovered from the rolled-back sandbox and
-  gate-verified on the rebuild machine: 224 tests / 0 failed /
-  4 ignored (live TTS, need installed voices), clippy -D warnings
-  clean, fmt clean. ALL PUSHED to origin/main.
-- NEXT: M8 release assets, verification phase, GOALS evidence, tag
-  v0.0.5-alpha.
-- M7 cli ✓: workspace now 294 tests / 0 failed / 4 ignored (live TTS);
-  clippy -D warnings + fmt clean; black-box smoke verified (exit codes
-  0/2/6/7/8, byte-identical determinism, negative --target-lufs,
-  batch out-NNN, listings, doctor on empty HOME).
-- Delegation pattern that works: agents MUST read Panoptes skill fully
-  + BUILD-PLAN.md section, then write+gate; subagent Task prompts must
-  stay SHORT (point at files, not inline specs). Long prompts or 3
-  parallel heavy agents hit tool deadlines — run at most 1-2 heavy
-  build agents at a time.
-- Verified API surfaces for M4-M7 are in the committed code itself
-  (read crates/qinari-dsp/src/*.rs and crates/qinari-audio/src/*.rs).
-- LUFS test anchor (corrected): stereo L=R sine at -23 dBFS/channel
-  == mono -20 dBFS == -23.0 LUFS.
-- Time crate must NOT enter the tree (RUSTSEC-2026-0009 in old
-  tracing-appender path) — CLI logging writes via Arc<File> directly. Below are the specs for the remaining
-milestones, encoding every design decision and previously-solved bug fix.
-Agents: read Panoptes skill fully first (repo-external bundle), then your
-section. Build gates before reporting: fmt, clippy -D warnings, tests.
+  M6 tts ✓ 9e1c371 | M7 cli ✓ f1ecdf0.
+- M8 release assets ✓ 87ed64a (benches + Installer.sh + release.yml),
+  dedf624 (download dir fix + numpy reference), fabe55e (BENCHMARKS,
+  CLI.md, AUDIO-PIPELINE, TTS.md, README, GOALS evidence).
+- VERIFICATION ✓ V1 (strict gates: fmt/clippy/tests x3/bench/deny/
+  unsafe/secrets/shellcheck/exit-code sweep) + V2 (docs-vs-reality
+  audit) ran as subagents; findings fixed in 36418ac — brickwall
+  limiter (transient ceiling overshoot up to 1.1 dB), tts positional
+  dash now reads stdin, --target-lufs/--ceiling enforced, live TTS
+  tests serialized and stabilized. Final gate on 36418ac: fmt clean,
+  clippy -D warnings clean, 297 tests / 0 failed / 4 ignored, live
+  4/4 x3 runs, bench --no-run, deny all ok, shellcheck clean.
+- REMAINING: tag v0.0.5-alpha (release.yml publishes the tarball +
+  sha256 sidecar).
 
 ## M2 qinari-dsp (pure computation, no I/O, only dep thiserror)
 

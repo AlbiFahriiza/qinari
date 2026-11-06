@@ -52,8 +52,11 @@ With mastering on (the default), the house chain runs
 2. Apply the gain that moves the render to the target LUFS
    (default −16).
 3. Run the character chain per channel: DC blocker, character shelves
-   (RBJ), compressor, then a stereo-linked lookahead limiter at the
-   ceiling (default −1.0 dBFS).
+   (RBJ), compressor, then a stereo-linked lookahead limiter that
+   enforces the ceiling as a hard brickwall (default −1.0 dBFS): the
+   gain attacks instantly on the 5 ms window maximum, so even a
+   full-scale click cannot escape, and a final clamp guarantees it for
+   any input.
 4. Re-measure and correct with up to three clamped ±2 dB steps while
    the residual exceeds 0.3 LU.
 
@@ -61,8 +64,8 @@ The three characters differ in shelf gains and compressor law:
 `transparent` keeps the spectrum flat and barely touches dynamics
 (1.25:1 at −12 dB), `warm` lifts lows and tames presence, `punchy`
 adds low weight, presence, and a firmer 3:1 ratio. On this machine the
-chain lands a 10 s render within 0.1 LU of the target (see
-`docs/BENCHMARKS.md`).
+chain lands a 10 s render within 0.1 LU of the target and transient
+recipes exactly at the ceiling (see `docs/BENCHMARKS.md`).
 
 `qinari analyze` measures the same integrated LUFS, peak, and RMS with
 the same meter, so what the render summary reports and what `analyze`

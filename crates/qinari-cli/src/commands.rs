@@ -978,8 +978,10 @@ pub fn tts(ctx: &RunContext, args: &TtsArgs) -> Result<(), QinariError> {
         })?,
     };
     let text = match &args.text {
-        Some(text) => text.clone(),
-        None => read_tts_text(args.file.as_deref().unwrap_or("-"))?,
+        // A positional "-" reads stdin, matching the --file - convention;
+        // an explicit --file wins over the positional form.
+        Some(text) if text.as_str() != "-" => text.clone(),
+        _ => read_tts_text(args.file.as_deref().unwrap_or("-"))?,
     };
     let options = RenderOptions::resolve(&overrides_from(&args.overrides)?, &ctx.config)?;
     let out = out_path(args.out.as_deref(), None, 0);

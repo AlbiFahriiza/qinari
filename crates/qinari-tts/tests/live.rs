@@ -13,12 +13,24 @@
 //! optimized inference.
 
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
 use qinari_tts::local::{ensure_espeak_data, LocalVitsEngine};
 use qinari_tts::textnorm::Language;
 use qinari_tts::{find_voice, SynthRequest, TtsEngine, TtsError};
+
+/// Serializes the live tests: two ONNX engines running in parallel on a
+/// small CPU starve each other, which both inflates the measured RTF and
+/// (through thread-count-dependent matmul reduction order) perturbs the
+/// VITS duration predictor. One synthesis at a time keeps the suite
+/// reproducible.
+fn live_lock() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 /// Root of the CLI's data layout.
 fn data_root() -> PathBuf {
@@ -69,10 +81,15 @@ fn request(text: &str, language: Language, voice: &str, speed: f32) -> SynthRequ
 #[test]
 #[ignore = "needs the en_US-libritts-high voice installed"]
 fn en_voice_synthesizes_faster_than_realtime() {
+    let _guard = live_lock();
     ensure_espeak_data(&espeak_dir(), &[Language::En, Language::Id]).expect("espeak data");
     let engine = en_engine();
     let request = request(
-        "The quick brown fox jumps over the lazy dog, twice.",
+        // Long enough that the duration floor below is robust against the
+        // predictor's run-to-run variation of a few hundred milliseconds.
+        "The quick brown fox jumps over the lazy dog while the early bird 
+         catches the worm, and the owl watches them both from the old oak 
+         tree, patient and unimpressed.",
         Language::En,
         "en_US-libritts-high",
         1.0,
@@ -90,7 +107,7 @@ fn en_voice_synthesizes_faster_than_realtime() {
         synthesis.audio.peak()
     );
     assert!(
-        synthesis.audio.duration() > 1.0,
+        synthesis.audio.duration() > 2.5,
         "suspiciously short: {}s",
         synthesis.audio.duration()
     );
@@ -109,10 +126,12 @@ fn en_voice_synthesizes_faster_than_realtime() {
 #[test]
 #[ignore = "needs the id_ID-news_tts-medium voice installed"]
 fn id_voice_synthesizes_faster_than_realtime() {
+    let _guard = live_lock();
     ensure_espeak_data(&espeak_dir(), &[Language::En, Language::Id]).expect("espeak data");
     let engine = id_engine();
     let request = request(
-        "Selamat pagi, semoga hari Anda menyenangkan.",
+        "Selamat pagi, semoga hari Anda menyenangkan dan penuh semangat 
+         sampai matahari terbenam di ufuk barat.",
         Language::Id,
         "id_ID-news_tts-medium",
         1.0,
@@ -142,6 +161,7 @@ fn id_voice_synthesizes_faster_than_realtime() {
 #[test]
 #[ignore = "needs the en_US-libritts-high voice installed"]
 fn faster_speed_shortens_audio() {
+    let _guard = live_lock();
     ensure_espeak_data(&espeak_dir(), &[Language::En, Language::Id]).expect("espeak data");
     let engine = en_engine();
     let text = "This sentence is spoken twice, once slowly and once quickly.";
@@ -167,6 +187,7 @@ fn faster_speed_shortens_audio() {
 #[test]
 #[ignore = "needs the en_US-libritts-high voice installed"]
 fn local_engine_rejects_mismatched_voice_and_rate() {
+    let _guard = live_lock();
     ensure_espeak_data(&espeak_dir(), &[Language::En, Language::Id]).expect("espeak data");
     let engine = en_engine();
     let wrong_voice = request("Hello.", Language::En, "id_ID-news_tts-medium", 1.0);

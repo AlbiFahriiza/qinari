@@ -7,7 +7,8 @@ an OpenAI-compatible cloud service.
 ```
 qinari tts "Halo, selamat datang di Qinari." --lang id -o halo.wav
 qinari tts "Hello from Qinari." --lang en -o hello.mp3
-cat story.txt | qinari tts - --lang en -o story.wav
+cat story.txt | qinari tts - --lang en -o story.wav     # "-" reads stdin
+qinari tts --file story.txt --lang en -o story.wav     # same, explicit
 ```
 
 ## Voices
@@ -18,9 +19,11 @@ cat story.txt | qinari tts - --lang en -o story.wav
 | `id_ID-news_tts-medium` | Indonesian | medium | non-commercial |
 
 Voices are installed with `qinari setup` (or per voice with
-`--voice <ID>`): the model and its config are downloaded with `curl`,
-verified against pinned SHA-256 digests and sizes, and validated by a
-real synthesis. `--list-voices` shows the catalog.
+`--voice <ID>`): the model is downloaded with `curl` and verified
+against its pinned SHA-256 digest and size; the small `.onnx.json`
+config sibling is downloaded and existence-checked (the catalog pins
+no digest for it). Each installed voice is validated by a real
+synthesis. `--list-voices` shows the catalog.
 
 The Indonesian voice is for non-commercial use. Installing it means
 accepting that license — pass `--accept-license`, confirm

@@ -7,11 +7,11 @@ No sample libraries, no accounts: audio from parameters, deterministic
 per seed. Output: `.wav` and `.mp3` only.
 
 ```
-$ qinari sfx rain -d 30s --seed storm --set intensity=0.9
-rain.wav — 30.0 s @ 44100 Hz, peak -4.6 dBFS, -25.9 LUFS in / -16.0 LUFS out, 6.3 MiB, mastered
+$ qinari sfx rain -d 30s --seed storm --set intensity=0.9 -o rain.wav
+rain.wav — 30.0 s @ 44100 Hz, peak -4.6 dBFS, -23.0 LUFS in / -16.0 LUFS out, 7.6 MiB, mastered
 
 $ qinari tts "Halo, selamat datang di Qinari." --lang id -o halo.wav
-halo.wav — 1.7 s @ 22050 Hz, 1 ch, mastered
+halo.wav — 1.3 s @ 44100 Hz, peak -1.6 dBFS, -26.0 LUFS in / -16.0 LUFS out, 168.1 KiB, mastered
 
 $ qinari music synthwave -d 60s --seed nightdrive -o drive.mp3
 ```
@@ -42,7 +42,9 @@ Prebuilt Linux x86_64 binary (release page has a SHA-256 sidecar):
 curl -fsSL https://raw.githubusercontent.com/AlbiFahriiza/qinari/main/Installer.sh | bash
 ```
 
-Or review then run:
+Or review then run (the script is plain bash; it downloads the release
+tarball with curl, verifies its SHA-256 sidecar, and installs to
+`~/.local` without root):
 
 ```
 curl -fsSL -o Installer.sh https://raw.githubusercontent.com/AlbiFahriiza/qinari/main/Installer.sh
@@ -87,6 +89,7 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 | Indonesian TTS | — | RTF 0.05 |
 | English TTS | — | RTF 0.31 |
 | 30 s `rain`, end-to-end vs a NumPy/SciPy port | 0.29 s vs 1.81 s | 6.2× faster |
+| mastered output peak | at the ceiling (−1.0 dBFS default), enforced on transients | brickwall |
 
 ## How it works
 

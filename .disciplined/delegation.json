@@ -15,6 +15,22 @@
       "difficulty": "medium",
       "fit": "bash + GitHub Actions infra; shellcheck/bash -n gates available",
       "gated": true
+    },
+    {
+      "id": "V1",
+      "task": "Strict gate suite: fmt/clippy/test x3/bench --no-run/deny/unsafe/secrets/shellcheck/black-box exit codes",
+      "subagent": "general-purpose",
+      "difficulty": "high",
+      "fit": "verification agent; must reproduce every gate itself and report raw outputs",
+      "gated": false
+    },
+    {
+      "id": "V2",
+      "task": "Docs-vs-reality audit: every claim in README/CLI.md/BENCHMARKS.md/AUDIO-PIPELINE.md/TTS.md/GOALS.md vs source and the built binary",
+      "subagent": "general-purpose",
+      "difficulty": "high",
+      "fit": "verification agent; runs documented commands against the binary and diffs claims vs code",
+      "gated": false
     }
   ]
 }

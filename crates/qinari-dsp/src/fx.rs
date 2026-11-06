@@ -251,13 +251,18 @@ impl Compressor {
 /// the sliding-window maximum of `max(|l|, |r|)` over the window ending
 /// at the current input sample (monotonic deque keyed by absolute sample
 /// position), so both channels always receive the same gain. The gain
-/// envelope attacks in 5 ms and releases in 50 ms (95% at nominal time).
+/// attacks **instantly** and releases in 50 ms (95% at nominal time):
+/// the emerging sample is the oldest member of the window, so the full
+/// reduction is due immediately — a smoothed attack would leave a
+/// level-proportional residual (a +20 dB click escaped a −1.0 ceiling
+/// by more than a decibel before the attack was made instant), while
+/// the lookahead places the gain dip just ahead of the transient. A
+/// final clamp to the ceiling guarantees the brickwall for any input.
 /// Note the inherent `lookahead`-sample latency at the output.
 #[derive(Debug, Clone)]
 pub struct StereoLimiter {
     ceiling: f32,
     lookahead: usize,
-    attack_coef: f32,
     release_coef: f32,
     gain: f32,
     delay_l: Vec<f32>,
@@ -271,12 +276,11 @@ impl StereoLimiter {
     /// Creates a limiter with the ceiling given in dBFS (e.g. `-1.0`).
     pub fn new(sample_rate: f32, ceiling_db: f32) -> Self {
         let lookahead = ((0.005 * sample_rate).round() as usize).max(1);
-        let coef = |secs: f32| 1.0 - (-3.0 / (secs * sample_rate)).exp();
+        let release_coef = 1.0 - (-3.0 / (0.050 * sample_rate)).exp();
         Self {
             ceiling: db_to_linear(ceiling_db),
             lookahead,
-            attack_coef: coef(0.005),
-            release_coef: coef(0.050),
+            release_coef,
             gain: 1.0,
             delay_l: vec![0.0; lookahead],
             delay_r: vec![0.0; lookahead],
@@ -311,12 +315,13 @@ impl StereoLimiter {
             Some(&(_, max_peak)) if max_peak > 1.0e-9 => (self.ceiling / max_peak).min(1.0),
             _ => 1.0,
         };
-        let coef = if target < self.gain {
-            self.attack_coef
+        if target < self.gain {
+            // Instant attack: see the struct documentation. The window
+            // already holds the transient this reduction must catch.
+            self.gain = target;
         } else {
-            self.release_coef
-        };
-        self.gain += (target - self.gain) * coef;
+            self.gain += (target - self.gain) * self.release_coef;
+        }
 
         let out_l = self.delay_l[self.delay_index];
         let out_r = self.delay_r[self.delay_index];
@@ -327,7 +332,10 @@ impl StereoLimiter {
             self.delay_index = 0;
         }
         self.position += 1;
-        (out_l * self.gain, out_r * self.gain)
+        (
+            (out_l * self.gain).clamp(-self.ceiling, self.ceiling),
+            (out_r * self.gain).clamp(-self.ceiling, self.ceiling),
+        )
     }
 }
 
@@ -549,6 +557,51 @@ mod tests {
             "output peak {peak} vs ceiling {ceiling}"
         );
         assert!(peak > ceiling * 0.9, "output peak {peak} too quiet");
+    }
+
+    #[test]
+    fn limiter_holds_ceiling_on_a_single_impulse() {
+        // Regression: a full-scale single-sample transient at a released
+        // gain must still emerge at or below the ceiling. The 5 ms
+        // attack ramp alone cannot guarantee that (it is only ~95%
+        // settled when the impulse leaves the lookahead window), so the
+        // limiter needs a hard ceiling stage for the residual.
+        let ceiling = db_to_linear(-1.0);
+        let mut limiter = StereoLimiter::new(SR, -1.0);
+        let mut peak = 0.0f32;
+        for i in 0..48_000 {
+            let x = if i == 1_000 { 1.0f32 } else { 0.0 };
+            let (l, r) = limiter.process(x, x);
+            peak = peak.max(l.abs()).max(r.abs());
+        }
+        assert!(
+            peak <= ceiling * 1.001,
+            "impulse escaped the ceiling: {peak} > {ceiling}"
+        );
+    }
+
+    #[test]
+    fn limiter_holds_ceiling_on_a_fast_attack_click() {
+        // A 1 ms attack riding a 2 kHz carrier — the shape that made
+        // mastered UI clicks overshoot the documented ceiling.
+        let ceiling = db_to_linear(-1.0);
+        let mut limiter = StereoLimiter::new(SR, -1.0);
+        let mut peak = 0.0f32;
+        let mut env = 0.0f32;
+        for i in 0..48_000 {
+            env = if i < 48 {
+                i as f32 / 48.0
+            } else {
+                env * 0.9995
+            };
+            let x = env * (2.0 * std::f32::consts::PI * 2000.0 * i as f32 / SR).sin();
+            let (l, r) = limiter.process(x, x);
+            peak = peak.max(l.abs()).max(r.abs());
+        }
+        assert!(
+            peak <= ceiling * 1.001,
+            "click escaped the ceiling: {peak} > {ceiling}"
+        );
     }
 
     #[test]

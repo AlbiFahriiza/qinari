@@ -37,7 +37,8 @@ QINARI_BIN=./target/release/qinari python3 benchmarks/numpy_reference.py 30
 | footsteps | 9.6 ms | 1042× |
 | ambient storm bed, 60 s | 693 ms | 87× |
 
-### qinari-music (30 s stereo 44.1 kHz per style)
+### qinari-music (30 s stereo 44.1 kHz; the three heaviest-representative
+styles of the five)
 
 | Case | Time | Realtime factor |
 | --- | --- | --- |
@@ -83,6 +84,14 @@ ceiling −1.0 dBFS), verified with `qinari analyze`:
 | peak after limiting | **−4.3 dBFS** (ceiling −1.0) |
 | re-mastering the output | −16.0 → −16.0 LUFS (stable) |
 
+The ceiling is a hard invariant on transient material too (all
+measured with `qinari analyze` on delivered files): `ui_click`,
+`hit`, and `impact` 3 s renders all peak at exactly **−1.0 dBFS** with
+the default ceiling, and a `--ceiling -0.5` render peaks at exactly
+**−0.5 dBFS**. Regression tests pin this with a full-scale impulse
+and a fast-attack click (`limiter_holds_ceiling_on_a_single_impulse`,
+`limiter_holds_ceiling_on_a_fast_attack_click`).
+
 ## Qinari vs NumPy/SciPy (`benchmarks/numpy_reference.py`)
 
 The script is a faithful vectorized port of the `rain` recipe (Kellet
@@ -112,4 +121,5 @@ six times sooner.
 | G5 30 s music track | < 3 s | 272 ms (cinematic) | pass (11.0×) |
 | G6 TTS RTF | ≤ 0.4 | 0.31 / 0.05 | pass |
 | G8 mastering | ± 1.0 LU of target | 0.0 LU | pass |
+| G8 ceiling | peak ≤ ceiling | exactly at ceiling (−1.0 / −0.5 dBFS), transients included | pass |
 | G12 documented comparison | measured 30 s vs numpy | table above | pass |

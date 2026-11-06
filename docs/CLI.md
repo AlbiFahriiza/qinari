@@ -14,7 +14,7 @@ qinari [GLOBAL OPTIONS] <COMMAND> [ARGS]
 | --- | --- |
 | `--config <FILE>` | Read the config from this file instead of `~/.config/qinari/config.toml`. |
 | `-q`, `--quiet` | Suppress informational output; errors still print. |
-| `-v`, `--verbose` | More log detail. Repeat for debug level. Details always land in `~/.local/state/qinari/qinari.log`. |
+| `-v`, `--verbose` | More log detail. Repeat for debug level. Details land in `~/.local/state/qinari/qinari.log` (stderr is the fallback when the log file cannot be opened). |
 
 Global options may be given before or after the subcommand. Negative
 values (for example `--target-lufs -14`) parse correctly after the
@@ -49,7 +49,7 @@ Render a procedural sound effect.
 | Option | Effect |
 | --- | --- |
 | `--list` | List all recipes (29) and exit. |
-| `-o`, `--out <FILE>` | Output path (`.wav`/`.mp3`). Default: recipe name + extension. |
+| `-o`, `--out <FILE>` | Output path (`.wav`/`.mp3`). Default: `out.wav` (batch runs: `out-000.wav`, `out-001.wav`, …). |
 | `-d`, `--duration <T>` | `3` by default. Bare seconds or `ms`/`s`/`m`/`h` units. |
 | `--seed <TEXT>` | Any text; same seed = bit-identical output. Default: time-based. |
 | `--set NAME=VALUE` | Set a recipe parameter (repeatable). Unknown names get a "did you mean" hint. |
@@ -66,7 +66,7 @@ Example:
 
 ```
 qinari sfx rain -d 30s --seed storm --set intensity=0.9 -o rain.wav
-qinari sfx laser --batch 5 --seed laser-set        # laser-001.wav …
+qinari sfx laser --batch 5 --seed laser-set        # out-000.wav … out-004.wav
 ```
 
 ### `qinari ambient <PRESET>`
@@ -82,7 +82,7 @@ Compose a music track (default 30 s, 5 s to 600 s).
 | Option | Effect |
 | --- | --- |
 | `--list` | List the styles and exit. |
-| `--bpm <N>` | Tempo; each style has its own valid range. Default: the style's typical tempo. |
+| `--bpm <N>` | Tempo; out-of-range values are clamped into the style's range. Default: the style's typical tempo. |
 
 Styles: `lofi` (72–90, jazzy and swung), `ambient` (58–72, pads without
 drums), `synthwave` (100–118, driving), `cinematic` (76–96, tense),
@@ -91,8 +91,9 @@ requested duration to finish the current musical section.
 
 ### `qinari tts`
 
-Speak text. The text is a positional argument, or read with `--file`
-(a path, or `-` for stdin).
+Speak text. The text is a positional argument (`-` reads stdin), or
+read with `--file` (a path, or `-`); an explicit `--file` wins over
+the positional form.
 
 | Option | Effect |
 | --- | --- |
@@ -121,7 +122,7 @@ Re-master an existing `.wav`/`.mp3` file with the house chain. Accepts
 
 ### `qinari analyze <FILE>`
 
-Print duration, integrated loudness (LUFS), true peak, and RMS of a
+Print duration, integrated loudness (LUFS), sample peak, and RMS of a
 `.wav`/`.mp3` file. A missing or undecodable file is a usage error.
 
 ### `qinari bench`
@@ -154,13 +155,14 @@ when unhealthy, `0` when healthy; a missing config file is only a note.
 | `--depth` | `16`, `24`, `32f` | `24` |
 | `--bitrate` | 128, 192, 256, 320 kbps (mp3) | 320 |
 | `--master` / `--no-master` | run or skip the mastering chain | master |
-| `--target-lufs` | −30.0 to −5.0 | −16.0 |
-| `--ceiling` | −3.0 to 0.0 dBFS | −1.0 |
+| `--target-lufs` | −30.0 to −5.0 (enforced) | −16.0 |
+| `--ceiling` | −3.0 to 0.0 dBFS (enforced) | −1.0 |
 | `--character` | `transparent`, `warm`, `punchy` | `transparent` |
 
 Renders land in a `.qinari-tmp` sibling first and are renamed into
-place, so a failed encode never leaves a half-written output. 16- and
-24-bit output is noise-shaped TPDF dithered.
+place, so a failed encode never leaves a half-written output. 16-bit
+output uses noise-shaped TPDF dither; 24-bit uses flat TPDF dither;
+32f passes through untouched.
 
 ## Configuration file
 
@@ -213,12 +215,12 @@ the config file or the log.
 | --- | --- |
 | 0 | Success |
 | 1 | Unexpected internal error |
-| 2 | Usage error: bad arguments, unknown recipe/preset/style/voice (with a "did you mean" hint), unusable input file |
+| 2 | Usage error: bad arguments, unknown recipe/preset/style (with a "did you mean" hint), unusable input file, out-of-range `--target-lufs`/`--ceiling` |
 | 3 | Configuration or setup error |
 | 4 | Network or download error |
 | 5 | Render/DSP error |
 | 6 | Encode error, including a non-`.wav`/`.mp3` output path |
-| 7 | TTS engine error |
+| 7 | TTS engine error, including an unknown voice (with a "did you mean" hint) |
 | 8 | `qinari doctor` found problems |
 
 ## Determinism

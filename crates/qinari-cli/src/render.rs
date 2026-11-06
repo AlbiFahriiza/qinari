@@ -129,18 +129,52 @@ impl RenderOptions {
             None => parse_character(&config.mastering.character)
                 .map_err(|m| QinariError::setup(format!("config [mastering] character: {m}")))?,
         };
+        let target_lufs = if let Some(value) = overrides.target_lufs {
+            validate_target_lufs(value)
+                .map_err(|m| QinariError::usage(format!("--target-lufs: {m}")))?;
+            value
+        } else {
+            validate_target_lufs(config.mastering.lufs)
+                .map_err(|m| QinariError::setup(format!("config [mastering] lufs: {m}")))?;
+            config.mastering.lufs
+        };
+        let ceiling_db = if let Some(value) = overrides.ceiling_db {
+            validate_ceiling(value).map_err(|m| QinariError::usage(format!("--ceiling: {m}")))?;
+            value
+        } else {
+            validate_ceiling(config.mastering.ceiling)
+                .map_err(|m| QinariError::setup(format!("config [mastering] ceiling: {m}")))?;
+            config.mastering.ceiling
+        };
         Ok(Self {
             sr,
             depth,
             mp3,
             master: overrides.master.unwrap_or(config.output.master),
             settings: MasteringSettings {
-                target_lufs: overrides.target_lufs.unwrap_or(config.mastering.lufs),
-                ceiling_db: overrides.ceiling_db.unwrap_or(config.mastering.ceiling),
+                target_lufs,
+                ceiling_db,
                 character,
             },
         })
     }
+}
+
+/// A loudness target outside this range cannot be delivered sensibly.
+fn validate_target_lufs(value: f32) -> Result<(), String> {
+    if !(-30.0..=-5.0).contains(&value) {
+        return Err(format!("{value} is out of range (-30.0..=-5.0 LUFS)"));
+    }
+    Ok(())
+}
+
+/// A ceiling above 0 dBFS would ask for clipped output; far below -3
+/// audibly pumps.
+fn validate_ceiling(value: f32) -> Result<(), String> {
+    if !(-3.0..=0.0).contains(&value) {
+        return Err(format!("{value} is out of range (-3.0..=0.0 dBFS)"));
+    }
+    Ok(())
 }
 
 /// What one finished render measured and wrote.

@@ -18,10 +18,11 @@ permissions:
 jobs:
   release:
     name: Build, smoke, and publish
-    # Pinned: ubuntu-latest (26.04) builds against glibc 2.43, which
-    # current Debian stable and every Ubuntu LTS below 26.04 cannot run.
-    # 22.04 keeps the shipped binary usable on glibc >= 2.35 systems.
-    runs-on: ubuntu-22.04
+    # Pinned: ubuntu-latest (26.04) links against glibc 2.43, which even
+    # current Debian stable cannot run, while 22.04's glibc 2.35 is too
+    # old for the bundled ONNX Runtime (needs glibc 2.39 + libstdc++ 13).
+    # 24.04 is the floor this build chain actually supports.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -57,9 +58,10 @@ jobs:
           body: |
             Qinari ${{ github.ref_name }}
 
-            Prebuilt binary for x86_64-unknown-linux-gnu (needs glibc
-            2.35+ — Ubuntu 22.04+, Debian 12+, RHEL 9+), bundled with
-            LICENSE and README.md. Verify the download against the
-            .sha256 sidecar before use:
+            Prebuilt binary for x86_64-unknown-linux-gnu, bundled with
+            LICENSE and README.md. Needs glibc 2.39+ and libstdc++ 13.2+
+            (Ubuntu 24.04+, Debian 13+, Fedora 40+); on older
+            distributions, install Rust and use Installer.sh --build.
+            Verify the download against the .sha256 sidecar before use:
 
                 sha256sum -c qinari-x86_64-unknown-linux-gnu.tar.gz.sha256

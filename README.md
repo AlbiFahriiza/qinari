@@ -36,8 +36,10 @@ $ qinari music synthwave -d 60s --seed nightdrive -o drive.mp3
 
 ## Install
 
-Prebuilt Linux x86_64 binary (glibc 2.35+ — Ubuntu 22.04+, Debian 12+,
-RHEL 9+; the release page has a SHA-256 sidecar):
+Prebuilt Linux x86_64 binary (needs glibc 2.39+ and libstdc++ 13.2+ —
+Ubuntu 24.04+, Debian 13+, Fedora 40+; the release page has a SHA-256
+sidecar; older distributions can build from source with
+`Installer.sh --build`):
 
 ```
 curl -fsSL https://raw.githubusercontent.com/AlbiFahriiza/qinari/main/Installer.sh | bash

@@ -434,7 +434,7 @@ fn doctor_reports_unhealthy_on_an_empty_home() {
 }
 
 /// Installs the doctor stubs: config file, the engine bundle files, one
-/// voice style.
+/// voice style, and the DNSMOS model pair.
 fn install_doctor_stubs(sandbox: &Sandbox) {
     let config = sandbox.home.join(".config/qinari");
     std::fs::create_dir_all(&config).expect("config dir");
@@ -455,6 +455,11 @@ fn install_doctor_stubs(sandbox: &Sandbox) {
     let styles = model.join("voice_styles");
     std::fs::create_dir_all(&styles).expect("styles dir");
     std::fs::write(styles.join("M1.json"), b"{}").expect("style stub");
+    let dnsmos = sandbox.home.join(".local/share/qinari/models/dnsmos");
+    std::fs::create_dir_all(&dnsmos).expect("dnsmos dir");
+    for name in ["sig_bak_ovr.onnx", "model_v8.onnx"] {
+        std::fs::write(dnsmos.join(name), b"stub").expect("dnsmos stub");
+    }
 }
 
 #[test]
@@ -570,6 +575,54 @@ fn analyze_names_a_missing_file_as_a_usage_error() {
 }
 
 #[test]
+fn analyze_speech_prints_the_speech_section() {
+    let sandbox = Sandbox::new("analyze-speech");
+    sandbox.ok(&["sfx", "rain", "-d", "1", "--seed", "s", "-o", "r.wav"]);
+    let measured = sandbox.ok(&["analyze", "r.wav", "--speech"]);
+    let text = stdout(&measured);
+    let line = text
+        .lines()
+        .find(|line| line.starts_with("speech   "))
+        .expect("a speech line");
+    assert!(line.contains("voiced"), "{line}");
+    assert!(line.contains("pauses"), "{line}");
+    // Without the flag the section stays away.
+    let plain = sandbox.ok(&["analyze", "r.wav"]);
+    assert!(!stdout(&plain).contains("speech   "));
+}
+
+#[test]
+fn analyze_mos_without_models_points_at_setup() {
+    let sandbox = Sandbox::new("analyze-mos-missing");
+    sandbox.ok(&["sfx", "rain", "-d", "1", "--seed", "s", "-o", "r.wav"]);
+    sandbox
+        .qinari()
+        .args(["analyze", "r.wav", "--mos"])
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicate::str::contains("qinari setup"));
+}
+
+#[test]
+fn analyze_json_carries_the_speech_section() {
+    let sandbox = Sandbox::new("analyze-json");
+    sandbox.ok(&["sfx", "rain", "-d", "1", "--seed", "s", "-o", "r.wav"]);
+    let measured = sandbox.ok(&["analyze", "r.wav", "--json"]);
+    let value: serde_json::Value = serde_json::from_str(&stdout(&measured)).expect("valid json");
+    assert!(
+        value["duration_s"].as_f64().expect("duration") > 0.9,
+        "{value}"
+    );
+    assert!(value["speech"]["pause_count"].is_u64(), "{value}");
+    assert!(
+        value["lufs"].is_number() || value["lufs"].is_null(),
+        "{value}"
+    );
+    assert!(value.get("dnsmos").is_none(), "no dnsmos without --mos");
+}
+
+#[test]
 fn corrupt_config_is_a_hard_setup_error_naming_the_file() {
     let sandbox = Sandbox::new("corrupt-config");
     let config = sandbox.home.join(".config/qinari");
@@ -636,4 +689,321 @@ fn unknown_style_and_preset_get_hints() {
         .failure()
         .code(2)
         .stderr(predicate::str::contains("did you mean"));
+}
+
+#[test]
+fn render_json_prints_one_object_per_file_to_stdout() {
+    let sandbox = Sandbox::new("render-json");
+    let output = sandbox.ok(&[
+        "sfx",
+        "ui_click",
+        "-d",
+        "1",
+        "--seed",
+        "3",
+        "-o",
+        "click.wav",
+        "--json",
+    ]);
+    let text = stdout(&output);
+    let lines: Vec<&str> = text.trim().lines().collect();
+    assert_eq!(lines.len(), 1, "one JSON object, nothing else: {text}");
+    let report: serde_json::Value = serde_json::from_str(lines[0]).expect("valid json");
+    assert_eq!(report["path"], "click.wav");
+    assert_eq!(report["format"], "wav");
+    assert_eq!(report["sample_rate"], 44_100);
+    assert_eq!(report["channels"], 2);
+    assert_eq!(report["bits"], "24");
+    assert_eq!(report["mastered"], true);
+    assert_eq!(report["engine"], serde_json::Value::Null);
+    assert_eq!(report["voice"], serde_json::Value::Null);
+    assert_eq!(report["sha256"].as_str().map(str::len), Some(64));
+    assert!(report["duration_s"].as_f64().is_some_and(|d| d > 0.9));
+    assert!(report["size_bytes"].as_u64().is_some_and(|s| s > 0));
+    assert!(report["rtf"].as_f64().is_some_and(|r| r >= 0.0));
+    assert!(sandbox.work_path("click.wav").is_file());
+    // The human summary moved to stderr so stdout stays parseable.
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("click.wav"), "{stderr}");
+}
+
+#[test]
+fn render_json_reports_null_bits_for_mp3() {
+    let sandbox = Sandbox::new("render-json-mp3");
+    let output = sandbox.ok(&[
+        "sfx",
+        "ui_click",
+        "-d",
+        "1",
+        "--seed",
+        "3",
+        "-o",
+        "click.mp3",
+        "--json",
+        "--quiet",
+    ]);
+    let report: serde_json::Value =
+        serde_json::from_str(stdout(&output).trim()).expect("valid json");
+    assert_eq!(report["format"], "mp3");
+    assert_eq!(report["bits"], serde_json::Value::Null);
+    // --json still prints under --quiet; the human stderr line does not.
+    assert!(
+        String::from_utf8_lossy(&output.stderr).trim().is_empty(),
+        "quiet + json must stay clean on stderr"
+    );
+}
+
+#[test]
+fn render_json_prints_one_line_per_batch_file() {
+    let sandbox = Sandbox::new("render-json-batch");
+    let output = sandbox.ok(&[
+        "sfx", "laser", "-d", "0.5", "--seed", "4", "--batch", "2", "--json",
+    ]);
+    let text = stdout(&output);
+    let lines: Vec<&str> = text.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "one JSON object per rendered file");
+    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("first object");
+    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("second object");
+    assert_eq!(first["path"], "out-000.wav");
+    assert_eq!(second["path"], "out-001.wav");
+}
+
+#[test]
+fn music_json_reports_the_music_lane() {
+    let sandbox = Sandbox::new("music-json");
+    let output = sandbox.ok(&["music", "lofi", "-d", "5", "--seed", "2", "--json"]);
+    let report: serde_json::Value =
+        serde_json::from_str(stdout(&output).trim()).expect("valid json");
+    assert_eq!(report["format"], "wav");
+    assert_eq!(report["engine"], serde_json::Value::Null);
+    assert_eq!(report["voice"], serde_json::Value::Null);
+    assert!(report["duration_s"].as_f64().is_some_and(|d| d >= 5.0));
+}
+
+#[test]
+fn tts_new_flags_are_validated_with_usage_errors() {
+    let sandbox = Sandbox::new("tts-flags");
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--prosody", "bouncy", "hi"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "--prosody must be flat or natural",
+        ));
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--steps", "0", "hi"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "--steps must be between 1 and 100",
+        ));
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--steps", "101", "hi"])
+        .assert()
+        .failure()
+        .code(2);
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--format", "flac", "hi"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("--format must be wav or mp3"));
+    sandbox
+        .qinari()
+        .args([
+            "tts",
+            "--lang",
+            "en",
+            "--style",
+            "F1",
+            "--style-file",
+            "s.json",
+            "hi",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("contradict each other"));
+    // An unknown style preset is a tts error with the hint discipline.
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--style", "M9", "hi"])
+        .assert()
+        .failure()
+        .code(7)
+        .stderr(predicate::str::contains("unknown style"));
+    // A missing style file is a usage error naming the path.
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "en", "--style-file", "no-such.json", "hi"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("no such file"));
+}
+
+#[test]
+fn tts_missing_text_file_is_a_usage_error() {
+    let sandbox = Sandbox::new("tts-missing-file");
+    sandbox
+        .qinari()
+        .args(["tts", "--lang", "id", "--file", "no-such.txt", "halo"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("could not read text file"));
+}
+
+#[test]
+fn master_missing_input_is_a_usage_error() {
+    let sandbox = Sandbox::new("master-missing");
+    sandbox
+        .qinari()
+        .args(["master", "no-such-input.wav"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("could not decode"));
+}
+
+#[test]
+fn config_get_and_set_round_trip() {
+    let sandbox = Sandbox::new("config-roundtrip");
+    let output = sandbox.ok(&["config", "get", "output.sr"]);
+    assert_eq!(stdout(&output).trim(), "44100");
+    // set is silent on success (git style) and persists.
+    let output = sandbox.ok(&["config", "set", "output.sr", "48000"]);
+    assert!(
+        stdout(&output).trim().is_empty(),
+        "config set prints nothing on success"
+    );
+    let output = sandbox.ok(&["config", "get", "output.sr"]);
+    assert_eq!(stdout(&output).trim(), "48000");
+    // The stored value actually drives renders.
+    sandbox.ok(&["sfx", "ui_click", "-d", "0.5", "-o", "cfg.wav", "--quiet"]);
+    let measured = sandbox.ok(&["analyze", "cfg.wav"]);
+    assert!(stdout(&measured).contains("48000 Hz"));
+}
+
+#[test]
+fn config_get_and_set_work_through_the_config_flag() {
+    let sandbox = Sandbox::new("config-flag-file");
+    let custom = sandbox.work_path("custom.toml");
+    sandbox.ok(&[
+        "--config",
+        "custom.toml",
+        "config",
+        "set",
+        "output.mp3",
+        "128",
+    ]);
+    // The file was created and holds the value.
+    assert!(custom.is_file());
+    let output = sandbox.ok(&["--config", "custom.toml", "config", "get", "output.mp3"]);
+    assert_eq!(stdout(&output).trim(), "128");
+    // The sandbox default config was not touched.
+    let output = sandbox.ok(&["config", "get", "output.mp3"]);
+    assert_eq!(stdout(&output).trim(), "320");
+}
+
+#[test]
+fn config_unknown_key_is_a_usage_error_listing_keys() {
+    let sandbox = Sandbox::new("config-unknown");
+    sandbox
+        .qinari()
+        .args(["config", "get", "output.sample_rate"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("unknown config key"))
+        .stderr(predicate::str::contains("output.sr"))
+        .stderr(predicate::str::contains("tts.voice"));
+    sandbox
+        .qinari()
+        .args(["config", "set", "nope", "1"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("valid keys"));
+}
+
+#[test]
+fn config_invalid_values_are_usage_errors() {
+    let sandbox = Sandbox::new("config-invalid");
+    for (key, value) in [
+        ("output.sr", "44100.5"),
+        ("output.sr", "192001"),
+        ("output.bit", "12"),
+        ("output.mp3", "100"),
+        ("output.master", "yes"),
+        ("mastering.lufs", "-31"),
+        ("mastering.ceiling", "-5"),
+        ("mastering.character", "hot"),
+        ("tts.engine", "remote"),
+        ("tts.base", "ftp://x"),
+        ("tts.model", ""),
+    ] {
+        sandbox
+            .qinari()
+            .args(["config", "set", key, value])
+            .assert()
+            .failure()
+            .code(2)
+            .stderr(predicate::str::contains("config"))
+            .stderr(predicate::str::contains(key));
+    }
+    // The license list is managed by setup, not by hand.
+    sandbox
+        .qinari()
+        .args([
+            "config",
+            "set",
+            "tts.accepted_licenses",
+            "supertonic-openrail-m",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("qinari setup"));
+    // A missing value argument is a clap usage error.
+    sandbox
+        .qinari()
+        .args(["config", "set", "output.sr"])
+        .assert()
+        .failure()
+        .code(2);
+    // Nothing above was stored: the defaults still read back.
+    let output = sandbox.ok(&["config", "get", "output.sr"]);
+    assert_eq!(stdout(&output).trim(), "44100");
+}
+
+#[test]
+fn interactive_help_works() {
+    let sandbox = Sandbox::new("interactive-help");
+    sandbox
+        .qinari()
+        .args(["interactive", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Prompted renders in a loop"));
+}
+
+#[test]
+fn interactive_leaves_cleanly_off_a_terminal() {
+    // Under piped stdin/stderr the prompts cannot render, which dialoguer
+    // reports as an error; the session treats that as a clean leave.
+    let sandbox = Sandbox::new("interactive-piped");
+    let mut command = sandbox.qinari();
+    command
+        .arg("interactive")
+        .write_stdin("")
+        .assert()
+        .success()
+        .code(0);
 }

@@ -8,10 +8,11 @@
 
 use crate::config::{Config, Paths};
 use crate::download::{download, DownloadError, DownloadSpec};
-use crate::render::{finish_and_write, OutputOverrides, RenderOptions};
+use crate::render::{finish_and_write, OutputOverrides, RenderOptions, RenderSummary};
 use crate::xcode::QinariError;
 use clap::{Args, Parser};
 use dialoguer::Confirm;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use qinari_audio::decode_audio;
 use qinari_dsp::buffer::linear_to_db;
 use qinari_dsp::lufs::integrated_lufs;
@@ -23,10 +24,15 @@ use qinari_sfx::{
     SfxError,
 };
 use qinari_tts::cloud::{CloudConfig, OpenAiCompatibleEngine};
-use qinari_tts::engine::{ProsodyMode, StyleSpec, TtsEngine, DEFAULT_STEPS};
+use qinari_tts::engine::{ProsodyMode, StyleSpec, TtsEngine, DEFAULT_STEPS, MAX_STEPS, MIN_STEPS};
 use qinari_tts::supertonic::SupertonicEngine;
-use qinari_tts::voices::{default_voice, find_voice, voices, LicenseClass, VoiceEntry};
+use qinari_tts::voices::{
+    default_voice, find_by_style_name, find_voice, voices, LicenseClass, VoiceEntry,
+};
 use qinari_tts::{Language, SynthRequest, TtsError};
+use qinari_verify::dnsmos::{self, DnsmosScores, DNSMOS_ASSETS};
+use qinari_verify::report::FeatureReport;
+use qinari_verify::VerifyError;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -46,7 +52,7 @@ pub struct RunContext {
 /// Flags overriding the `[output]` and `[mastering]` config sections.
 ///
 /// Shared by every command that writes audio.
-#[derive(Debug, Clone, Args)]
+#[derive(Debug, Clone, Default, Args)]
 pub struct OverrideFlags {
     /// Sample rate in hertz (8000..=192000).
     #[arg(long)]
@@ -119,6 +125,9 @@ pub struct SfxArgs {
     /// Channels: 1 (mono) or 2 (stereo).
     #[arg(long, default_value_t = 2)]
     pub channels: u16,
+    /// Print machine-readable output (one JSON object per file).
+    #[arg(long)]
+    pub json: bool,
     #[command(flatten)]
     pub overrides: OverrideFlags,
 }
@@ -144,6 +153,9 @@ pub struct AmbientArgs {
     /// Channels: 1 (mono) or 2 (stereo).
     #[arg(long, default_value_t = 2)]
     pub channels: u16,
+    /// Print machine-readable output.
+    #[arg(long)]
+    pub json: bool,
     #[command(flatten)]
     pub overrides: OverrideFlags,
 }
@@ -172,6 +184,9 @@ pub struct MusicArgs {
     /// Channels: 1 (mono) or 2 (stereo).
     #[arg(long, default_value_t = 2)]
     pub channels: u16,
+    /// Print machine-readable output.
+    #[arg(long)]
+    pub json: bool,
     #[command(flatten)]
     pub overrides: OverrideFlags,
 }
@@ -194,15 +209,39 @@ pub struct TtsArgs {
     /// Engine: auto, local, or cloud (default from config).
     #[arg(long)]
     pub engine: Option<String>,
-    /// Speed factor 0.5..=2.0.
+    /// Speed factor 0.5..=2.0 (local voices clamp to 0.7..=2.0).
     #[arg(long, default_value_t = 1.0)]
     pub speed: f32,
+    /// Denoising steps 1..=100; more steps trade speed for quality.
+    #[arg(long, default_value_t = DEFAULT_STEPS)]
+    pub steps: u8,
+    /// Seed text; the same seed renders the same audio. Empty = time-based.
+    #[arg(long)]
+    pub seed: Option<String>,
+    /// Style preset name (M1..M5, F1..F5) or full voice id.
+    #[arg(long)]
+    pub style: Option<String>,
+    /// Custom style file (Supertonic voice-style JSON) instead of a preset.
+    #[arg(long)]
+    pub style_file: Option<PathBuf>,
+    /// Prosody post-chain: natural (pauses + jitter) or flat (SDK behavior).
+    #[arg(long, default_value = "natural")]
+    pub prosody: String,
+    /// Speak markup tags verbatim instead of parsing them.
+    #[arg(long)]
+    pub no_markup: bool,
+    /// Output container: wav or mp3 (overrides the -o extension).
+    #[arg(long)]
+    pub format: Option<String>,
     /// Channels: 1 (mono) or 2 (stereo).
     #[arg(long, default_value_t = 1)]
     pub channels: u16,
     /// Output file (.wav or .mp3); default out.wav.
     #[arg(long, short = 'o')]
     pub out: Option<PathBuf>,
+    /// Print machine-readable output.
+    #[arg(long)]
+    pub json: bool,
     #[command(flatten)]
     pub overrides: OverrideFlags,
 }
@@ -216,6 +255,9 @@ pub struct MasterArgs {
     /// Output file (.wav or .mp3); default <input stem>-mastered.wav.
     #[arg(long, short = 'o')]
     pub out: Option<PathBuf>,
+    /// Print machine-readable output.
+    #[arg(long)]
+    pub json: bool,
     #[command(flatten)]
     pub overrides: OverrideFlags,
 }
@@ -226,6 +268,16 @@ pub struct MasterArgs {
 pub struct AnalyzeArgs {
     /// Input file (.wav or .mp3).
     pub file: PathBuf,
+    /// Print the speech section: voicing, F0 statistics, pauses.
+    #[arg(long)]
+    pub speech: bool,
+    /// Score the file with the vendored DNSMOS models (MOS estimates).
+    #[arg(long)]
+    pub mos: bool,
+    /// Print machine-readable output (always includes the speech
+    /// section; `dnsmos` appears with `--mos`).
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// `qinari bench`: time reference renders.
@@ -439,6 +491,114 @@ fn overrides_from(flags: &OverrideFlags) -> Result<OutputOverrides, QinariError>
     })
 }
 
+/// Reports one finished render: the machine-readable object goes to
+/// stdout under `--json` (with the human summary on stderr, so stdout stays
+/// parseable); without `--json` the human summary goes to stdout unless
+/// `--quiet` is set. `engine`/`voice` name the TTS lane for `tts` renders.
+///
+/// # Errors
+///
+/// Returns an internal error when the JSON form cannot be serialized.
+fn report_render(
+    ctx: &RunContext,
+    json: bool,
+    summary: &RenderSummary,
+    engine: Option<&str>,
+    voice: Option<&str>,
+) -> Result<(), QinariError> {
+    if json {
+        println!("{}", summary.to_json(engine, voice)?);
+        if !ctx.quiet {
+            eprintln!("{}", summary.describe());
+        }
+    } else if !ctx.quiet {
+        println!("{}", summary.describe());
+    }
+    Ok(())
+}
+
+/// Forces the `--format` container onto the output path.
+///
+/// `wav`/`mp3` rewrite the path's extension (a bare `out` becomes
+/// `out.wav`); anything else is a usage error. `None` passes the path
+/// through unchanged.
+///
+/// # Errors
+///
+/// Returns a usage error for a container other than `wav` or `mp3`.
+fn apply_format(out: PathBuf, format: Option<&str>) -> Result<PathBuf, QinariError> {
+    let Some(format) = format else {
+        return Ok(out);
+    };
+    match format {
+        "wav" | "mp3" => Ok(out.with_extension(format)),
+        other => Err(QinariError::usage(format!(
+            "--format must be wav or mp3, got {other:?}"
+        ))),
+    }
+}
+
+/// Parses `--prosody` into the library's mode.
+///
+/// # Errors
+///
+/// Returns a usage error for anything but `flat` or `natural`.
+fn parse_prosody(text: &str) -> Result<ProsodyMode, QinariError> {
+    match text {
+        "natural" => Ok(ProsodyMode::Natural),
+        "flat" => Ok(ProsodyMode::Flat),
+        other => Err(QinariError::usage(format!(
+            "--prosody must be flat or natural, got {other:?}"
+        ))),
+    }
+}
+
+/// Resolves `--style` / `--style-file` into the library's style spec.
+///
+/// # Errors
+///
+/// Returns a usage error when both flags are given or `--style-file` names
+/// no existing file, and a tts error for an unknown style preset (with a
+/// "did you mean" hint).
+fn resolve_style(style: Option<&str>, style_file: Option<&Path>) -> Result<StyleSpec, QinariError> {
+    match (style, style_file) {
+        (Some(_), Some(_)) => Err(QinariError::usage(
+            "--style and --style-file contradict each other",
+        )),
+        (Some(name), None) => {
+            if find_by_style_name(name).is_none() {
+                let hint = suggest(name, &voice_ids()).map_or_else(
+                    || format!("unknown style {name:?}"),
+                    |close| format!("unknown style {name:?}; did you mean {close:?}?"),
+                );
+                return Err(QinariError::tts(hint));
+            }
+            Ok(StyleSpec::Preset(name.to_string()))
+        }
+        (None, Some(path)) => {
+            if !path.is_file() {
+                return Err(QinariError::usage(format!(
+                    "could not read the style file {}: no such file",
+                    path.display()
+                )));
+            }
+            Ok(StyleSpec::File(path.to_path_buf()))
+        }
+        (None, None) => Ok(StyleSpec::Default),
+    }
+}
+
+/// Validates `--steps`.
+fn validate_steps(steps: u8) -> Result<u8, QinariError> {
+    if (MIN_STEPS..=MAX_STEPS).contains(&steps) {
+        Ok(steps)
+    } else {
+        Err(QinariError::usage(format!(
+            "--steps must be between {MIN_STEPS} and {MAX_STEPS}, got {steps}"
+        )))
+    }
+}
+
 /// Validates `--channels`.
 fn validate_channels(raw: u16) -> Result<u16, QinariError> {
     match raw {
@@ -508,13 +668,88 @@ pub fn setup(ctx: &mut RunContext, args: &SetupArgs) -> Result<(), QinariError> 
     }
     check_environment(&ctx.paths)?;
     ensure_config(ctx)?;
-    for voice in selected_voices(&args.voices)? {
-        install_voice(ctx, voice, args)?;
+    let selected = selected_voices(&args.voices)?;
+    // The overall bar spans every file the install still needs (voices
+    // plus the DNSMOS pair); it stays absent under --quiet and when
+    // everything is already in place.
+    let progress = (!ctx.quiet)
+        .then(|| planned_download_count(&ctx.paths, &selected))
+        .filter(|&total| total > 0)
+        .map(SetupProgress::new);
+    for voice in selected {
+        install_voice(ctx, voice, args, progress.as_ref())?;
+    }
+    install_dnsmos(ctx, progress.as_ref())?;
+    if let Some(progress) = &progress {
+        progress.finish();
     }
     if !ctx.quiet {
         println!("setup complete");
     }
     Ok(())
+}
+
+/// Setup's aggregate download progress: one multi-progress tree holding
+/// the overall "file n/total" bar above the per-file byte bars, so the
+/// 398 MB bundle shows how far along the whole install is.
+struct SetupProgress {
+    multi: MultiProgress,
+    overall: ProgressBar,
+}
+
+impl SetupProgress {
+    /// Creates the tree with an overall bar counting `total` file downloads.
+    fn new(total: u64) -> Self {
+        let multi = MultiProgress::new();
+        let overall = ProgressBar::new(total);
+        overall.set_style(
+            ProgressStyle::with_template("{msg}: file {pos}/{len}")
+                .unwrap_or_else(|_| ProgressStyle::default_bar()),
+        );
+        overall.set_message("installing voices".to_string());
+        let overall = multi.add(overall);
+        Self { multi, overall }
+    }
+
+    /// Marks one more fetched file.
+    fn file_done(&self) {
+        self.overall.inc(1);
+    }
+
+    /// Clears the bar once the install loop ends.
+    fn finish(&self) {
+        self.overall.finish_and_clear();
+    }
+}
+
+/// How many files `setup` still needs to fetch: the shared bundle's
+/// missing files (counted once — only the first selected voice downloads
+/// them), each selected voice's missing style file, and the DNSMOS pair
+/// when it is not installed yet.
+fn planned_download_count(paths: &Paths, selected: &[&'static VoiceEntry]) -> u64 {
+    let bundle_missing = selected.first().map_or(0, |voice| {
+        voice
+            .bundle
+            .files
+            .iter()
+            .filter(|file| !paths.supertonic_bundle_file(file.rel_path).is_file())
+            .count() as u64
+    });
+    let styles_missing = selected
+        .iter()
+        .filter(|voice| !paths.supertonic_style(voice).is_file())
+        .count() as u64;
+    let dnsmos_missing = DNSMOS_ASSETS
+        .iter()
+        .filter(|asset| {
+            !paths
+                .models_dir
+                .join("dnsmos")
+                .join(asset.rel_path)
+                .is_file()
+        })
+        .count() as u64;
+    bundle_missing + styles_missing + dnsmos_missing
 }
 
 /// Prints the voice catalog with sizes, licenses, and the restricted
@@ -611,11 +846,13 @@ fn selected_voices(filter: &[String]) -> Result<Vec<&'static VoiceEntry>, Qinari
 
 /// Installs one voice: license gate, bundle + style downloads, validation
 /// synthesis. The shared engine bundle files are downloaded once —
-/// `download` skips files that are already present and verified.
+/// `download` skips files that are already present and verified. The
+/// overall bar ticks once per file that actually needed fetching.
 fn install_voice(
     ctx: &mut RunContext,
     voice: &'static VoiceEntry,
     args: &SetupArgs,
+    progress: Option<&SetupProgress>,
 ) -> Result<(), QinariError> {
     let accepted = ctx
         .config
@@ -646,25 +883,83 @@ fn install_voice(
             voice.bundle.size_bytes() as f64 / (1024.0 * 1024.0)
         );
     }
+    let parent = progress.map(|p| &p.multi);
     for file in voice.bundle.files {
-        download(&DownloadSpec {
-            url: file.url.to_string(),
-            dest: ctx.paths.supertonic_bundle_file(file.rel_path),
-            expected_size: Some(file.size_bytes),
-            expected_sha256: Some(file.sha256.to_string()),
-            label: format!("supertonic {}", file.rel_path),
-        })
+        let dest = ctx.paths.supertonic_bundle_file(file.rel_path);
+        let needs_fetch = !dest.exists();
+        download(
+            &DownloadSpec {
+                url: file.url.to_string(),
+                dest,
+                expected_size: Some(file.size_bytes),
+                expected_sha256: Some(file.sha256.to_string()),
+                label: format!("supertonic {}", file.rel_path),
+            },
+            parent,
+        )
         .map_err(|error| download_error(&error))?;
+        if needs_fetch {
+            if let Some(progress) = progress {
+                progress.file_done();
+            }
+        }
     }
-    download(&DownloadSpec {
-        url: voice.style_url.to_string(),
-        dest: ctx.paths.supertonic_style(voice),
-        expected_size: Some(voice.style_size_bytes),
-        expected_sha256: Some(voice.style_sha256.to_string()),
-        label: format!("{} style", voice.id),
-    })
+    let style_dest = ctx.paths.supertonic_style(voice);
+    let style_needs_fetch = !style_dest.exists();
+    download(
+        &DownloadSpec {
+            url: voice.style_url.to_string(),
+            dest: style_dest,
+            expected_size: Some(voice.style_size_bytes),
+            expected_sha256: Some(voice.style_sha256.to_string()),
+            label: format!("{} style", voice.id),
+        },
+        parent,
+    )
     .map_err(|error| download_error(&error))?;
+    if style_needs_fetch {
+        if let Some(progress) = progress {
+            progress.file_done();
+        }
+    }
     validate_synthesis(ctx, voice)
+}
+
+/// Installs the two vendored DNSMOS models (CC BY 4.0, ~1.3 MiB) that
+/// `analyze --mos` and the golden gates score with. The digests are
+/// pinned in `qinari-verify`; files already in place are verified, not
+/// re-downloaded.
+///
+/// # Errors
+///
+/// Download errors for failed fetches or digest mismatches.
+fn install_dnsmos(ctx: &RunContext, progress: Option<&SetupProgress>) -> Result<(), QinariError> {
+    let dir = ctx.paths.models_dir.join("dnsmos");
+    let parent = progress.map(|p| &p.multi);
+    for asset in &DNSMOS_ASSETS {
+        let dest = dir.join(asset.rel_path);
+        let needs_fetch = !dest.exists();
+        download(
+            &DownloadSpec {
+                url: asset.url.to_string(),
+                dest,
+                expected_size: Some(asset.size_bytes),
+                expected_sha256: Some(asset.sha256.to_string()),
+                label: format!("dnsmos {}", asset.rel_path),
+            },
+            parent,
+        )
+        .map_err(|error| download_error(&error))?;
+        if needs_fetch {
+            if let Some(progress) = progress {
+                progress.file_done();
+            }
+        }
+    }
+    if !ctx.quiet {
+        println!("dnsmos models ready (`qinari analyze --mos`)");
+    }
+    Ok(())
 }
 
 /// Prints a skip note unless quiet.
@@ -795,6 +1090,19 @@ pub fn doctor(ctx: &RunContext) -> bool {
         problems += 1;
         println!("problem: the supertonic engine bundle is missing; run `qinari setup`");
     }
+    let dnsmos_installed = DNSMOS_ASSETS.iter().all(|asset| {
+        ctx.paths
+            .models_dir
+            .join("dnsmos")
+            .join(asset.rel_path)
+            .is_file()
+    });
+    if dnsmos_installed {
+        println!("ok: the DNSMOS models are installed (analyze --mos)");
+    } else {
+        problems += 1;
+        println!("problem: the DNSMOS models are missing; run `qinari setup`");
+    }
     let installed: Vec<&VoiceEntry> = voices()
         .iter()
         .filter(|voice| ctx.paths.supertonic_style(voice).is_file())
@@ -854,12 +1162,12 @@ pub fn sfx(ctx: &RunContext, args: &SfxArgs) -> Result<(), QinariError> {
             sr: options.sr,
             ch: usize::from(channels),
         };
+        let started = Instant::now();
         let buffer = render_sfx(&request).map_err(|error| sfx_error(&error))?;
+        let render_secs = started.elapsed().as_secs_f64();
         let out = out_path(args.out.as_deref(), args.batch, run);
-        let summary = finish_and_write(&buffer, &options, &out)?;
-        if !ctx.quiet {
-            println!("{}", summary.describe());
-        }
+        let summary = finish_and_write(&buffer, &options, &out, render_secs)?;
+        report_render(ctx, args.json, &summary, None, None)?;
     }
     Ok(())
 }
@@ -919,13 +1227,13 @@ pub fn ambient(ctx: &RunContext, args: &AmbientArgs) -> Result<(), QinariError> 
     let seed = seed_from(args.seed.as_deref());
     let channels = validate_channels(args.channels)?;
     let options = RenderOptions::resolve(&overrides_from(&args.overrides)?, &ctx.config)?;
+    let started = Instant::now();
     let buffer = render_ambient(preset, duration, seed, options.sr, usize::from(channels))
         .map_err(|error| ambient_error(&error))?;
+    let render_secs = started.elapsed().as_secs_f64();
     let out = out_path(args.out.as_deref(), None, 0);
-    let summary = finish_and_write(&buffer, &options, &out)?;
-    if !ctx.quiet {
-        println!("{}", summary.describe());
-    }
+    let summary = finish_and_write(&buffer, &options, &out, render_secs)?;
+    report_render(ctx, args.json, &summary, None, None)?;
     Ok(())
 }
 
@@ -969,12 +1277,12 @@ pub fn music(ctx: &RunContext, args: &MusicArgs) -> Result<(), QinariError> {
         sample_rate: options.sr,
         channels,
     };
+    let started = Instant::now();
     let buffer = render_track(&request).map_err(|error| music_error(&error))?;
+    let render_secs = started.elapsed().as_secs_f64();
     let out = out_path(args.out.as_deref(), None, 0);
-    let summary = finish_and_write(&buffer, &options, &out)?;
-    if !ctx.quiet {
-        println!("{}", summary.describe());
-    }
+    let summary = finish_and_write(&buffer, &options, &out, render_secs)?;
+    report_render(ctx, args.json, &summary, None, None)?;
     Ok(())
 }
 
@@ -1003,6 +1311,10 @@ pub fn tts(ctx: &RunContext, args: &TtsArgs) -> Result<(), QinariError> {
         QinariError::usage(format!("--lang must be id or en, got {:?}", args.lang))
     })?;
     let channels = validate_channels(args.channels)?;
+    let steps = validate_steps(args.steps)?;
+    let prosody = parse_prosody(&args.prosody)?;
+    let style = resolve_style(args.style.as_deref(), args.style_file.as_deref())?;
+    let seed = args.seed.as_deref().map(|text| seed_from(Some(text)));
     let preference = engine_preference(ctx, args.engine.as_deref())?;
     let voice = match args.voice.as_deref() {
         Some(id) => find_voice(id).ok_or_else(|| {
@@ -1016,33 +1328,64 @@ pub fn tts(ctx: &RunContext, args: &TtsArgs) -> Result<(), QinariError> {
             QinariError::tts(format!("no bundled voice for {}", language.as_code()))
         })?,
     };
-    let text = match &args.text {
-        // A positional "-" reads stdin, matching the --file - convention;
-        // an explicit --file wins over the positional form.
-        Some(text) if text.as_str() != "-" => text.clone(),
-        _ => read_tts_text(args.file.as_deref().unwrap_or("-"))?,
+    let text = match args.file.as_deref() {
+        // An explicit --file wins over the positional form; both accept
+        // "-" for stdin.
+        Some(path) => read_tts_text(path)?,
+        None => match &args.text {
+            Some(text) if text.as_str() != "-" => text.clone(),
+            _ => read_tts_text("-")?,
+        },
     };
     let options = RenderOptions::resolve(&overrides_from(&args.overrides)?, &ctx.config)?;
-    let out = out_path(args.out.as_deref(), None, 0);
+    let out = apply_format(
+        out_path(args.out.as_deref(), None, 0),
+        args.format.as_deref(),
+    )?;
     let use_local = match preference.as_str() {
         "local" => true,
         "cloud" => false,
         _ => voice_installed(&ctx.paths, voice),
     };
-    let audio = if use_local {
-        synthesize_locally(
-            ctx, voice, &text, language, args.speed, channels, options.sr,
-        )?
-    } else {
-        synthesize_in_cloud(
-            ctx, voice, &text, language, args.speed, channels, options.sr,
-        )?
+    let started = Instant::now();
+    let request = SynthRequest {
+        text,
+        language,
+        speed: args.speed,
+        voice: voice.id.to_string(),
+        sr: options.sr,
+        channels,
+        steps,
+        seed,
+        prosody,
+        style,
+        markup: !args.no_markup,
     };
-    let summary = finish_and_write(&audio, &options, &out)?;
-    if !ctx.quiet {
-        println!("{}", summary.describe());
-    }
-    Ok(())
+    let audio = if use_local {
+        synthesize_locally(ctx, voice, &request)?
+    } else {
+        synthesize_in_cloud(ctx, &request)?
+    };
+    let render_secs = started.elapsed().as_secs_f64();
+    let summary = finish_and_write(&audio, &options, &out, render_secs)?;
+    let engine_id = if use_local {
+        voice.engine.as_str()
+    } else {
+        "openai-compat"
+    };
+    let spoken_voice = if use_local {
+        voice.id
+    } else {
+        // The cloud lane speaks with the configured service voice.
+        ctx.config.tts.voice.as_str()
+    };
+    report_render(
+        ctx,
+        args.json,
+        &summary,
+        Some(engine_id),
+        Some(spoken_voice),
+    )
 }
 
 /// Resolves the engine preference: flag over config, both validated.
@@ -1064,14 +1407,14 @@ fn engine_preference(ctx: &RunContext, flag: Option<&str>) -> Result<String, Qin
 
 /// Speaks through the installed local voice. The engine synthesizes at
 /// its native 44 100 Hz and resamples to the target rate itself.
+///
+/// # Errors
+///
+/// Tts errors for a missing voice or engine failures.
 fn synthesize_locally(
     ctx: &RunContext,
     voice: &'static VoiceEntry,
-    text: &str,
-    language: Language,
-    speed: f32,
-    channels: u16,
-    sr: u32,
+    request: &SynthRequest,
 ) -> Result<qinari_dsp::buffer::AudioBuffer, QinariError> {
     if !voice_installed(&ctx.paths, voice) {
         return Err(QinariError::tts(format!(
@@ -1079,42 +1422,29 @@ fn synthesize_locally(
             voice.id
         )));
     }
-    let (clamped, was_clamped) = SupertonicEngine::clamp_speed(speed);
+    let (clamped, was_clamped) = SupertonicEngine::clamp_speed(request.speed);
     if was_clamped {
         eprintln!(
-            "warning: --speed {speed} is outside the voice's 0.7..=2.0 range; using {clamped} instead"
+            "warning: --speed {} is outside the voice's 0.7..=2.0 range; using {clamped} instead",
+            request.speed
         );
     }
     let engine = SupertonicEngine::load(&ctx.paths.supertonic_dir, voice)
         .map_err(|error| tts_error(&error))?;
-    let request = SynthRequest {
-        text: text.to_string(),
-        language,
-        speed,
-        voice: voice.id.to_string(),
-        sr,
-        channels,
-        steps: DEFAULT_STEPS,
-        seed: None,
-        prosody: ProsodyMode::Natural,
-        style: StyleSpec::Default,
-        markup: true,
-    };
     Ok(engine
-        .synthesize(&request)
+        .synthesize(request)
         .map_err(|error| tts_error(&error))?
         .audio)
 }
 
 /// Speaks through the configured OpenAI-compatible service.
+///
+/// # Errors
+///
+/// Tts errors for a missing key, network failures, or unusable responses.
 fn synthesize_in_cloud(
     ctx: &RunContext,
-    voice: &'static VoiceEntry,
-    text: &str,
-    language: Language,
-    speed: f32,
-    channels: u16,
-    sr: u32,
+    request: &SynthRequest,
 ) -> Result<qinari_dsp::buffer::AudioBuffer, QinariError> {
     let config = CloudConfig {
         base_url: ctx.config.tts.base.clone(),
@@ -1125,21 +1455,8 @@ fn synthesize_in_cloud(
         retries: 2,
     };
     let engine = OpenAiCompatibleEngine::new(config).map_err(|error| tts_error(&error))?;
-    let request = SynthRequest {
-        text: text.to_string(),
-        language,
-        speed,
-        voice: voice.id.to_string(),
-        sr,
-        channels,
-        steps: DEFAULT_STEPS,
-        seed: None,
-        prosody: ProsodyMode::Natural,
-        style: StyleSpec::Default,
-        markup: true,
-    };
     Ok(engine
-        .synthesize(&request)
+        .synthesize(request)
         .map_err(|error| tts_error(&error))?
         .audio)
 }
@@ -1156,12 +1473,14 @@ pub fn master_command(ctx: &RunContext, args: &MasterArgs) -> Result<(), QinariE
             "--master/--no-master do not apply to qinari master (it always masters)",
         ));
     }
+    let started = Instant::now();
     let buffer = decode_audio(&args.input).map_err(|error| {
         QinariError::usage(format!(
             "could not decode {}: {error}",
             args.input.display()
         ))
     })?;
+    let render_secs = started.elapsed().as_secs_f64();
     let mut options = RenderOptions::resolve(&overrides_from(&args.overrides)?, &ctx.config)?;
     // master keeps the source rate and always runs the chain.
     options.sr = buffer.sample_rate();
@@ -1170,11 +1489,8 @@ pub fn master_command(ctx: &RunContext, args: &MasterArgs) -> Result<(), QinariE
         .out
         .clone()
         .unwrap_or_else(|| mastered_default(&args.input));
-    let summary = finish_and_write(&buffer, &options, &out)?;
-    if !ctx.quiet {
-        println!("{}", summary.describe());
-    }
-    Ok(())
+    let summary = finish_and_write(&buffer, &options, &out, render_secs)?;
+    report_render(ctx, args.json, &summary, None, None)
 }
 
 /// Default output for master: `<input stem>-mastered.wav`.
@@ -1186,16 +1502,36 @@ fn mastered_default(input: &Path) -> PathBuf {
     PathBuf::from(format!("{stem}-mastered.wav"))
 }
 
-/// Runs `qinari analyze`: print loudness, peak, rms, duration.
+/// Runs `qinari analyze`: print loudness, peak, rms, duration, and —
+/// on request — the speech section (`--speech`) and DNSMOS scores
+/// (`--mos`, models from `<models>/dnsmos`, vendored by `setup`).
 ///
 /// # Errors
 ///
-/// Usage errors for a missing or undecodable input file.
-pub fn analyze(args: &AnalyzeArgs) -> Result<(), QinariError> {
+/// Usage errors for a missing or undecodable input file; a setup error
+/// when `--mos` is asked for but the models are not installed; render
+/// errors when scoring itself fails.
+pub fn analyze(ctx: &RunContext, args: &AnalyzeArgs) -> Result<(), QinariError> {
     let buffer = decode_audio(&args.file).map_err(|error| {
         QinariError::usage(format!("could not decode {}: {error}", args.file.display()))
     })?;
     let lufs = integrated_lufs(&buffer);
+    // The speech section rides along in the full report; the JSON form
+    // always carries it, the human form only with --speech.
+    let report = if args.speech || args.json {
+        Some(qinari_verify::analyze_buffer(&buffer))
+    } else {
+        None
+    };
+    let scores = if args.mos {
+        Some(dnsmos::dnsmos(&ctx.paths.models_dir.join("dnsmos"), &buffer).map_err(verify_error)?)
+    } else {
+        None
+    };
+    if args.json {
+        print_analyze_json(&args.file, &buffer, lufs, report.as_ref(), scores.as_ref());
+        return Ok(());
+    }
     println!("{}", args.file.display());
     println!(
         "duration {:.2} s @ {} Hz, {} ch",
@@ -1212,7 +1548,105 @@ pub fn analyze(args: &AnalyzeArgs) -> Result<(), QinariError> {
     );
     println!("peak {:.1} dBFS", linear_to_db(buffer.peak()));
     println!("rms {:.1} dBFS", linear_to_db(buffer.rms()));
+    if let Some(report) = &report {
+        print_speech_human(&report.speech);
+    }
+    if let Some(scores) = &scores {
+        print_dnsmos_human(scores);
+    }
     Ok(())
+}
+
+/// Maps measurement failures onto the CLI's exit codes: missing DNSMOS
+/// models are a setup problem (the fix is `qinari setup`), unreadable
+/// model files likewise, everything else is a render-time failure.
+fn verify_error(error: VerifyError) -> QinariError {
+    match error {
+        VerifyError::ModelMissing { .. } => QinariError::setup(format!(
+            "the DNSMOS models are not installed; run `qinari setup` first ({error})"
+        )),
+        VerifyError::Io(_) => {
+            QinariError::setup(format!("could not read the DNSMOS models: {error}"))
+        }
+        other => QinariError::render(format!("measurement failed: {other}")),
+    }
+}
+
+/// Prints the speech section in the human form: one line of voicing,
+/// F0, and pause statistics.
+fn print_speech_human(speech: &qinari_verify::speech::SpeechReport) {
+    let f0 = speech.f0.f0_mean_hz.map_or_else(
+        || "no F0".to_string(),
+        |hz| {
+            format!(
+                "f0 {hz:.0} Hz (sigma {} st, range {} st)",
+                speech
+                    .f0
+                    .f0_sigma_st
+                    .map_or("—".to_string(), |v| format!("{v:.1}")),
+                speech
+                    .f0
+                    .f0_range_st
+                    .map_or("—".to_string(), |v| format!("{v:.1}"))
+            )
+        },
+    );
+    println!(
+        "speech   voiced {:.0}% | {f0} | {} pauses ({:.2} s total, {:.1}/min)",
+        speech.f0.voiced_fraction * 100.0,
+        speech.pauses.count,
+        speech.pauses.total_s,
+        speech.pauses.rate_per_min
+    );
+}
+
+/// Prints the DNSMOS scores in the human form.
+fn print_dnsmos_human(scores: &DnsmosScores) {
+    println!(
+        "dnsmos   sig {:.2} bak {:.2} ovrl {:.2} (p808 {:.2})",
+        scores.sig, scores.bak, scores.ovrl, scores.p808
+    );
+}
+
+/// Prints the `analyze --json` object: one line, stdout only.
+fn print_analyze_json(
+    file: &Path,
+    buffer: &qinari_dsp::buffer::AudioBuffer,
+    lufs: Option<f64>,
+    report: Option<&FeatureReport>,
+    scores: Option<&DnsmosScores>,
+) {
+    let speech = report.map(|report| {
+        let speech = &report.speech;
+        serde_json::json!({
+            "voiced_fraction": speech.f0.voiced_fraction,
+            "f0_mean_hz": speech.f0.f0_mean_hz,
+            "f0_sigma_st": speech.f0.f0_sigma_st,
+            "f0_range_st": speech.f0.f0_range_st,
+            "pause_count": speech.pauses.count,
+            "pause_total_s": speech.pauses.total_s,
+            "pause_rate_per_min": speech.pauses.rate_per_min,
+        })
+    });
+    let mut json = serde_json::json!({
+        "file": file.display().to_string(),
+        "duration_s": buffer.duration(),
+        "sample_rate": buffer.sample_rate(),
+        "channels": buffer.num_channels(),
+        "lufs": lufs,
+        "peak_dbfs": linear_to_db(buffer.peak()),
+        "rms_dbfs": linear_to_db(buffer.rms()),
+        "speech": speech,
+    });
+    if let Some(scores) = scores {
+        json["dnsmos"] = serde_json::json!({
+            "sig": f64::from(scores.sig),
+            "bak": f64::from(scores.bak),
+            "ovrl": f64::from(scores.ovrl),
+            "p808": f64::from(scores.p808),
+        });
+    }
+    println!("{json}");
 }
 
 /// Runs `qinari bench`: times the reference renders and reports speedups.
@@ -1537,5 +1971,136 @@ mod tests {
             mastered_default(Path::new("mp3")),
             PathBuf::from("mp3-mastered.wav")
         );
+    }
+
+    #[test]
+    fn apply_format_rewrites_the_extension() {
+        assert_eq!(
+            apply_format(PathBuf::from("out.wav"), None).unwrap(),
+            PathBuf::from("out.wav")
+        );
+        assert_eq!(
+            apply_format(PathBuf::from("out.wav"), Some("mp3")).unwrap(),
+            PathBuf::from("out.mp3")
+        );
+        assert_eq!(
+            apply_format(PathBuf::from("take"), Some("wav")).unwrap(),
+            PathBuf::from("take.wav")
+        );
+        assert_eq!(
+            apply_format(PathBuf::from("song.flac"), Some("mp3")).unwrap(),
+            PathBuf::from("song.mp3")
+        );
+        for bad in ["flac", "ogg", "WAV", ""] {
+            let error = apply_format(PathBuf::from("out.wav"), Some(bad)).unwrap_err();
+            assert_eq!(error.code, ExitCode::Usage, "{bad}");
+            assert!(error.to_string().contains("wav or mp3"), "{error}");
+        }
+    }
+
+    #[test]
+    fn prosody_parsing_covers_both_modes() {
+        assert_eq!(parse_prosody("natural").unwrap(), ProsodyMode::Natural);
+        assert_eq!(parse_prosody("flat").unwrap(), ProsodyMode::Flat);
+        for bad in ["bouncy", "", "NATURAL"] {
+            let error = parse_prosody(bad).unwrap_err();
+            assert_eq!(error.code, ExitCode::Usage, "{bad}");
+            assert!(error.to_string().contains("flat or natural"), "{error}");
+        }
+    }
+
+    #[test]
+    fn style_resolution_covers_every_branch() {
+        assert_eq!(
+            resolve_style(None, None).unwrap(),
+            StyleSpec::Default,
+            "no flags: the voice's own style"
+        );
+        assert_eq!(
+            resolve_style(Some("F1"), None).unwrap(),
+            StyleSpec::Preset("F1".to_string())
+        );
+        assert_eq!(
+            resolve_style(Some("supertonic-M2"), None).unwrap(),
+            StyleSpec::Preset("supertonic-M2".to_string())
+        );
+        // Unknown preset: a tts error with a suggestion.
+        let error = resolve_style(Some("M9"), None).unwrap_err();
+        assert_eq!(error.code, ExitCode::Tts);
+        assert!(
+            error.to_string().contains("unknown style \"M9\""),
+            "{error}"
+        );
+        // Contradicting flags are a usage error.
+        let error = resolve_style(Some("F1"), Some(Path::new("s.json"))).unwrap_err();
+        assert_eq!(error.code, ExitCode::Usage);
+        assert!(error.to_string().contains("contradict"), "{error}");
+        // A missing style file is a usage error naming the path.
+        let error = resolve_style(None, Some(Path::new("/no/such/style.json"))).unwrap_err();
+        assert_eq!(error.code, ExitCode::Usage);
+        assert!(error.to_string().contains("style file"), "{error}");
+        assert!(error.to_string().contains("no such file"), "{error}");
+        // An existing file passes through as the file spec.
+        let dir = std::env::temp_dir().join(format!("qinari-cli-style-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let file = dir.join("my-style.json");
+        std::fs::write(&file, "{}").expect("style file");
+        assert_eq!(
+            resolve_style(None, Some(&file)).unwrap(),
+            StyleSpec::File(file.clone())
+        );
+    }
+
+    #[test]
+    fn steps_validation_matches_the_library_bounds() {
+        assert_eq!(validate_steps(1).unwrap(), 1);
+        assert_eq!(validate_steps(DEFAULT_STEPS).unwrap(), 8);
+        assert_eq!(validate_steps(100).unwrap(), 100);
+        for bad in [0_u8, 101, 255] {
+            let error = validate_steps(bad).unwrap_err();
+            assert_eq!(error.code, ExitCode::Usage, "{bad}");
+            assert!(error.to_string().contains("1 and 100"), "{error}");
+        }
+    }
+
+    #[test]
+    fn planned_download_count_counts_missing_files_once() {
+        let root = std::env::temp_dir().join(format!("qinari-cli-planned-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let paths = Paths {
+            config_file: root.join("config.toml"),
+            models_dir: root.join("models"),
+            supertonic_dir: root.join("models/supertonic"),
+            state_dir: root.join("state"),
+        };
+        let catalog = voices();
+        let two: Vec<&'static VoiceEntry> = catalog.iter().take(2).collect();
+        // Nothing installed: the shared bundle's files, two styles, and
+        // the DNSMOS pair.
+        assert_eq!(planned_download_count(&paths, &two), 6 + 2 + 2);
+        assert_eq!(planned_download_count(&paths, &[]), 2);
+        // The bundle present, one style present: only one style to fetch.
+        for file in two[0].bundle.files {
+            let path = paths.supertonic_bundle_file(file.rel_path);
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("dir");
+            std::fs::write(&path, b"stub").expect("bundle stub");
+        }
+        std::fs::create_dir_all(paths.supertonic_style(two[0]).parent().expect("parent"))
+            .expect("dir");
+        std::fs::write(paths.supertonic_style(two[0]), b"stub").expect("style stub");
+        assert_eq!(planned_download_count(&paths, &two), 1 + 2);
+        // Everything present: nothing planned.
+        std::fs::write(paths.supertonic_style(two[1]), b"stub").expect("style stub");
+        assert_eq!(planned_download_count(&paths, &two), 2);
+        // With the DNSMOS pair in place, a fully installed setup plans
+        // zero files.
+        let dnsmos = paths.models_dir.join("dnsmos");
+        std::fs::create_dir_all(&dnsmos).expect("dir");
+        for asset in &DNSMOS_ASSETS {
+            std::fs::write(dnsmos.join(asset.rel_path), b"stub").expect("dnsmos stub");
+        }
+        assert_eq!(planned_download_count(&paths, &two), 0);
+        assert_eq!(planned_download_count(&paths, &[]), 0);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

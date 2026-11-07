@@ -1341,6 +1341,7 @@ dependencies = [
  "qinari-music",
  "qinari-sfx",
  "qinari-tts",
+ "qinari-verify",
  "serde",
  "serde_json",
  "sha2",

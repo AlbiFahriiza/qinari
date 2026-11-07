@@ -7,6 +7,7 @@
 //! per-command output.
 
 use crate::config::Config;
+use crate::download::file_sha256;
 use crate::xcode::QinariError;
 use qinari_audio::{
     finalize_for_depth, master, resample, validate_output_path, write_mp3, write_wav, AudioFormat,
@@ -177,6 +178,23 @@ fn validate_ceiling(value: f32) -> Result<(), String> {
     Ok(())
 }
 
+/// The CLI spelling of a WAV bit depth (`16`, `24`, `32f`).
+fn depth_name(depth: BitDepth) -> &'static str {
+    match depth {
+        BitDepth::Bits16 => "16",
+        BitDepth::Bits24 => "24",
+        BitDepth::Float32 => "32f",
+    }
+}
+
+/// The lowercase container name of an output format.
+fn format_name(format: AudioFormat) -> &'static str {
+    match format {
+        AudioFormat::Wav => "wav",
+        AudioFormat::Mp3 => "mp3",
+    }
+}
+
 /// What one finished render measured and wrote.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RenderSummary {
@@ -186,6 +204,12 @@ pub struct RenderSummary {
     pub duration_secs: f64,
     /// Sample rate of the file.
     pub sample_rate: u32,
+    /// Channel count of the file.
+    pub channels: usize,
+    /// Container the file was written as.
+    pub format: AudioFormat,
+    /// WAV sample format the file carries (mp3 is lossy and has none).
+    pub depth: BitDepth,
     /// Peak absolute sample value (linear).
     pub peak: f32,
     /// Integrated loudness before the mastering chain, when measurable.
@@ -194,6 +218,11 @@ pub struct RenderSummary {
     pub output_lufs: Option<f64>,
     /// Size of the file in bytes.
     pub size_bytes: u64,
+    /// SHA-256 of the written file, lowercase hex.
+    pub sha256: String,
+    /// Wall-clock seconds the caller spent producing the audio (the
+    /// render or synthesis call, before delivery).
+    pub render_secs: f64,
     /// Whether the mastering chain ran.
     pub mastered: bool,
 }
@@ -220,6 +249,54 @@ impl RenderSummary {
             },
         )
     }
+
+    /// Real-time factor of the render: `render_secs / duration_secs`.
+    ///
+    /// Values below 1.0 mean the audio was produced faster than it plays
+    /// back. Unmeasurable (zero duration or zero clock) yields 0.0.
+    pub fn rtf(&self) -> f64 {
+        if self.duration_secs > 0.0 && self.render_secs > 0.0 {
+            self.render_secs / self.duration_secs
+        } else {
+            0.0
+        }
+    }
+
+    /// The machine-readable (`--json`) form of this render, one JSON
+    /// object. `engine` and `voice` name the TTS lane that produced the
+    /// audio (`None` for procedural renders).
+    ///
+    /// # Errors
+    ///
+    /// Returns an internal error when serialization fails (it cannot for
+    /// this value shape).
+    pub fn to_json(
+        &self,
+        engine: Option<&str>,
+        voice: Option<&str>,
+    ) -> Result<String, QinariError> {
+        let report = serde_json::json!({
+            "path": self.out,
+            "format": format_name(self.format),
+            "duration_s": self.duration_secs,
+            "sample_rate": self.sample_rate,
+            "channels": self.channels,
+            "bits": if self.format == AudioFormat::Wav {
+                serde_json::Value::from(depth_name(self.depth))
+            } else {
+                serde_json::Value::Null
+            },
+            "sha256": self.sha256,
+            "size_bytes": self.size_bytes,
+            "mastered": self.mastered,
+            "engine": engine,
+            "voice": voice,
+            "rtf": self.rtf(),
+        });
+        serde_json::to_string(&report).map_err(|error| {
+            QinariError::internal(format!("could not serialize the render report: {error}"))
+        })
+    }
 }
 
 /// `488 B`, `1.2 KiB`, `3.4 MiB`.
@@ -240,16 +317,20 @@ fn human_bytes(bytes: u64) -> String {
 /// The output path must end in `.wav` or `.mp3`. The buffer is resampled
 /// to `options.sr` when the rates differ, mastered (or measured as-is),
 /// dithered for the target depth, encoded into a `.qinari-tmp` sibling,
-/// and atomically renamed onto `out`.
+/// and atomically renamed onto `out`. `render_secs` is the wall-clock time
+/// the caller spent producing `buffer`; it is reported verbatim and as the
+/// real-time factor in [`RenderSummary::to_json`].
 ///
 /// # Errors
 ///
 /// Returns an encode error for an unsupported output path or a failing
-/// encoder, and a render error when resampling fails.
+/// encoder, a render error when resampling fails, and an internal error
+/// when the written file cannot be re-read for its digest.
 pub fn finish_and_write(
     buffer: &AudioBuffer,
     options: &RenderOptions,
     out: &Path,
+    render_secs: f64,
 ) -> Result<RenderSummary, QinariError> {
     let format = validate_output_path(out)?;
     let resampled = resample(buffer, options.sr).map_err(|error| {
@@ -286,15 +367,23 @@ pub fn finish_and_write(
     let size_bytes = fs::metadata(out)
         .map_err(|error| QinariError::encode(format!("could not stat {}: {error}", out.display())))?
         .len();
+    let sha256 = file_sha256(out).map_err(|error| {
+        QinariError::internal(format!("could not hash {}: {error}", out.display()))
+    })?;
 
     let summary = RenderSummary {
         out: out.to_path_buf(),
         duration_secs: finalized.duration(),
         sample_rate: finalized.sample_rate(),
+        channels: finalized.num_channels(),
+        format,
+        depth: options.depth,
         peak,
         input_lufs,
         output_lufs,
         size_bytes,
+        sha256,
+        render_secs,
         mastered: options.master,
     };
     info!(summary = summary.describe(), "render complete");
@@ -390,8 +479,8 @@ mod tests {
         let options = RenderOptions::resolve(&OutputOverrides::default(), &Config::default())
             .expect("default options");
         let out = temp_path("out.flac");
-        let error =
-            finish_and_write(&tone(44_100), &options, &out).expect_err("flac must be rejected");
+        let error = finish_and_write(&tone(44_100), &options, &out, 0.1)
+            .expect_err("flac must be rejected");
         assert_eq!(error.code, crate::xcode::ExitCode::Encode);
         assert!(error.to_string().contains(".wav and .mp3 only"), "{error}");
         assert!(!out.exists());
@@ -402,8 +491,21 @@ mod tests {
         let options = RenderOptions::resolve(&OutputOverrides::default(), &Config::default())
             .expect("default options");
         let out = temp_path("resampled.wav");
-        let summary = finish_and_write(&tone(48_000), &options, &out).expect("render succeeds");
+        let summary =
+            finish_and_write(&tone(48_000), &options, &out, 0.25).expect("render succeeds");
         assert_eq!(summary.sample_rate, 44_100);
+        assert_eq!(summary.channels, 2);
+        assert_eq!(summary.format, AudioFormat::Wav);
+        assert_eq!(summary.depth, BitDepth::Bits24);
+        assert_eq!(summary.sha256.len(), 64);
+        assert!(summary
+            .sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert_eq!(
+            summary.sha256,
+            file_sha256(&out).expect("digest of the file")
+        );
         assert!(
             (summary.duration_secs - 1.0).abs() < 0.05,
             "{}",
@@ -431,8 +533,10 @@ mod tests {
         };
         let options = RenderOptions::resolve(&overrides, &Config::default()).expect("options");
         let out = temp_path("unmastered.mp3");
-        let summary = finish_and_write(&tone(44_100), &options, &out).expect("render succeeds");
+        let summary =
+            finish_and_write(&tone(44_100), &options, &out, 0.1).expect("render succeeds");
         assert!(!summary.mastered);
+        assert_eq!(summary.format, AudioFormat::Mp3);
         // An unmastered 48 kHz-tone bed still reports its measured state.
         assert_eq!(summary.input_lufs, summary.output_lufs);
         assert!(summary.size_bytes > 0);
@@ -444,10 +548,15 @@ mod tests {
             out: PathBuf::from("/tmp/qinari.wav"),
             duration_secs: 10.0,
             sample_rate: 44_100,
+            channels: 2,
+            format: AudioFormat::Wav,
+            depth: BitDepth::Bits24,
             peak: 0.98,
             input_lufs: Some(-23.4),
             output_lufs: Some(-16.1),
             size_bytes: 1_500_000,
+            sha256: "a".repeat(64),
+            render_secs: 2.5,
             mastered: true,
         };
         let text = summary.describe();
@@ -456,6 +565,90 @@ mod tests {
         assert!(text.contains("-16.1 LUFS"), "{text}");
         assert!(text.contains("mastered"), "{text}");
         assert!(text.contains("MiB"), "{text}");
+        // The real-time factor: 2.5 s of work for 10 s of audio = 0.25.
+        assert!((summary.rtf() - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn summary_json_carries_the_documented_fields() {
+        let wav = RenderSummary {
+            out: PathBuf::from("out.wav"),
+            duration_secs: 4.0,
+            sample_rate: 44_100,
+            channels: 1,
+            format: AudioFormat::Wav,
+            depth: BitDepth::Bits16,
+            peak: 0.9,
+            input_lufs: Some(-20.0),
+            output_lufs: Some(-16.0),
+            size_bytes: 352_800,
+            sha256: "ab".repeat(32),
+            render_secs: 1.0,
+            mastered: true,
+        };
+        let text = wav
+            .to_json(Some("supertonic"), Some("supertonic-M1"))
+            .expect("json");
+        let value: serde_json::Value = serde_json::from_str(&text).expect("valid json");
+        assert_eq!(value["path"], "out.wav");
+        assert_eq!(value["format"], "wav");
+        assert_eq!(value["duration_s"], 4.0);
+        assert_eq!(value["sample_rate"], 44_100);
+        assert_eq!(value["channels"], 1);
+        assert_eq!(value["bits"], "16");
+        assert_eq!(value["sha256"], "ab".repeat(32));
+        assert_eq!(value["size_bytes"], 352_800);
+        assert_eq!(value["mastered"], true);
+        assert_eq!(value["engine"], "supertonic");
+        assert_eq!(value["voice"], "supertonic-M1");
+        assert!((value["rtf"].as_f64().expect("number") - 0.25).abs() < 1e-9);
+
+        let mp3 = RenderSummary {
+            out: PathBuf::from("out.mp3"),
+            format: AudioFormat::Mp3,
+            duration_secs: 2.0,
+            ..wav
+        };
+        let text = mp3.to_json(None, None).expect("json");
+        let value: serde_json::Value = serde_json::from_str(&text).expect("valid json");
+        assert_eq!(value["bits"], serde_json::Value::Null);
+        assert_eq!(value["engine"], serde_json::Value::Null);
+        assert_eq!(value["voice"], serde_json::Value::Null);
+        assert_eq!(value["format"], "mp3");
+    }
+
+    #[test]
+    fn rtf_is_zero_when_not_measurable() {
+        let summary = RenderSummary {
+            duration_secs: 0.0,
+            render_secs: 1.0,
+            ..summary_fixture()
+        };
+        assert_eq!(summary.rtf(), 0.0);
+        let summary = RenderSummary {
+            render_secs: 0.0,
+            ..summary_fixture()
+        };
+        assert_eq!(summary.rtf(), 0.0);
+    }
+
+    /// A structurally valid summary for field-override tests.
+    fn summary_fixture() -> RenderSummary {
+        RenderSummary {
+            out: PathBuf::from("out.wav"),
+            duration_secs: 1.0,
+            sample_rate: 44_100,
+            channels: 1,
+            format: AudioFormat::Wav,
+            depth: BitDepth::Bits24,
+            peak: 0.5,
+            input_lufs: None,
+            output_lufs: None,
+            size_bytes: 100,
+            sha256: "0".repeat(64),
+            render_secs: 0.5,
+            mastered: false,
+        }
     }
 
     #[test]

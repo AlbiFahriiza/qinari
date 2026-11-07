@@ -7,7 +7,7 @@
 //! tiny `.onnx.json` siblings are only existence-checked (their digests
 //! were never pinned by the voice catalog).
 
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
@@ -75,12 +75,17 @@ impl DownloadSpec {
 /// inspect), never a silent re-download. Downloads land in a `.part`
 /// sibling and are atomically renamed after verification.
 ///
+/// Progress: with `parent`, the per-file bar is nested under that
+/// multi-progress tree (below the caller's overall bar); without it no
+/// bar is drawn at all (`--quiet`). indicatif hides every bar by itself
+/// when stderr is not a terminal, so piped output stays clean either way.
+///
 /// # Errors
 ///
 /// Returns [`DownloadError::Curl`] when curl cannot run or fails,
 /// [`DownloadError::Checksum`] when a digest or size does not match, and
 /// [`DownloadError::Io`] for filesystem failures.
-pub fn download(spec: &DownloadSpec) -> Result<(), DownloadError> {
+pub fn download(spec: &DownloadSpec, parent: Option<&MultiProgress>) -> Result<(), DownloadError> {
     if spec.dest.exists() {
         verify_existing(spec)?;
         info!(label = %spec.label, dest = %spec.dest.display(), "already present");
@@ -91,8 +96,8 @@ pub fn download(spec: &DownloadSpec) -> Result<(), DownloadError> {
     // curl only creates the output file, never its directory: a voice id
     // like en_US-libritts-high names a directory that must exist first,
     // or curl dies with "write error" on its first body chunk.
-    if let Some(parent) = part.parent() {
-        fs::create_dir_all(parent)?;
+    if let Some(dir) = part.parent() {
+        fs::create_dir_all(dir)?;
     }
 
     let total = head_content_length(&spec.url)
@@ -102,7 +107,10 @@ pub fn download(spec: &DownloadSpec) -> Result<(), DownloadError> {
     if total.is_none() {
         warn!(url = %spec.url, "no content length known; progress is indeterminate");
     }
-    let bar = progress_bar(total, &spec.label);
+    let bar = match parent {
+        Some(multi) => multi.add(progress_bar(total, &spec.label)),
+        None => ProgressBar::hidden(),
+    };
 
     let mut child = Command::new("curl")
         .arg("--fail")
@@ -344,7 +352,7 @@ mod tests {
             expected_sha256: Some(sha256_of(payload)),
             label: "test model".to_string(),
         };
-        download(&spec).expect("download succeeds");
+        download(&spec, None).expect("download succeeds");
         assert_eq!(fs::read(&dest).expect("file renamed into place"), payload);
         assert!(!spec.part_path().exists(), "no .part left behind");
     }
@@ -361,7 +369,7 @@ mod tests {
             expected_sha256: Some(file_sha256(&dest).expect("hash")),
             label: "cached".to_string(),
         };
-        download(&spec).expect("existing file is accepted");
+        download(&spec, None).expect("existing file is accepted");
         assert_eq!(fs::read(&dest).expect("unchanged"), payload);
     }
 
@@ -376,7 +384,7 @@ mod tests {
             expected_sha256: Some("0".repeat(64)),
             label: "corrupt".to_string(),
         };
-        let error = download(&spec).expect_err("mismatch must fail");
+        let error = download(&spec, None).expect_err("mismatch must fail");
         match error {
             DownloadError::Checksum { path, detail } => {
                 assert_eq!(path, dest.display().to_string());
@@ -401,7 +409,7 @@ mod tests {
             expected_sha256: Some("a".repeat(64)),
             label: "mismatch".to_string(),
         };
-        let error = download(&spec).expect_err("bad content must fail");
+        let error = download(&spec, None).expect_err("bad content must fail");
         assert!(matches!(error, DownloadError::Checksum { .. }), "{error}");
         assert!(!spec.part_path().exists(), "bad .part removed");
         assert!(!dest.exists(), "nothing renamed into place");
@@ -418,7 +426,7 @@ mod tests {
             expected_sha256: None,
             label: "config".to_string(),
         };
-        download(&spec).expect("existence check only");
+        download(&spec, None).expect("existence check only");
         assert_eq!(fs::read(&dest).expect("unchanged"), b"{}");
     }
 
@@ -440,7 +448,7 @@ mod tests {
             expected_sha256: Some(sha256_of(payload)),
             label: "nested".to_string(),
         };
-        download(&spec).expect("download creates the destination directory");
+        download(&spec, None).expect("download creates the destination directory");
         assert_eq!(fs::read(&nested).expect("file written"), payload);
         let _ = fs::remove_dir_all(&dir);
     }

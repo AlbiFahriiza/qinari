@@ -8,7 +8,9 @@
 
 mod commands;
 mod config;
+mod config_cmd;
 mod download;
+mod interactive;
 mod render;
 mod xcode;
 
@@ -63,6 +65,10 @@ enum Commands {
     Bench(commands::BenchArgs),
     /// Show version, layout, config, and voices.
     Info(commands::InfoArgs),
+    /// Prompted renders in a loop.
+    Interactive(interactive::InteractiveArgs),
+    /// Read or write the configuration file.
+    Config(config_cmd::ConfigArgs),
     /// Print shell completion scripts.
     Completions(commands::CompletionsArgs),
     /// Scriptable health check (exit 8 when problems are found).
@@ -111,9 +117,11 @@ fn run(command: Commands, ctx: &mut RunContext) -> Result<ExitCode, QinariError>
         Commands::Music(args) => commands::music(ctx, &args)?,
         Commands::Tts(args) => commands::tts(ctx, &args)?,
         Commands::Master(args) => commands::master_command(ctx, &args)?,
-        Commands::Analyze(args) => commands::analyze(&args)?,
+        Commands::Analyze(args) => commands::analyze(ctx, &args)?,
         Commands::Bench(args) => commands::bench(ctx, &args)?,
         Commands::Info(args) => commands::info(ctx, &args)?,
+        Commands::Interactive(args) => interactive::interactive(ctx, &args),
+        Commands::Config(args) => config_cmd::run(ctx, &args)?,
         Commands::Completions(args) => commands::completions(&args),
         Commands::Doctor(_) => {
             if !commands::doctor(ctx) {
@@ -311,10 +319,62 @@ mod tests {
             "analyze",
             "bench",
             "info",
+            "interactive",
+            "config",
             "completions",
             "doctor",
         ] {
             assert!(help.contains(name), "missing subcommand {name}");
         }
+    }
+
+    #[test]
+    fn tts_parses_the_full_tuning_surface() {
+        let cli = Cli::try_parse_from([
+            "qinari",
+            "tts",
+            "--lang",
+            "id",
+            "--voice",
+            "supertonic-M2",
+            "--engine",
+            "local",
+            "--speed",
+            "1.2",
+            "--steps",
+            "16",
+            "--seed",
+            "storm",
+            "--style",
+            "F1",
+            "--prosody",
+            "flat",
+            "--no-markup",
+            "--format",
+            "mp3",
+            "--channels",
+            "2",
+            "--json",
+            "-o",
+            "take.wav",
+            "Halo!",
+        ])
+        .expect("valid invocation");
+        let Commands::Tts(args) = cli.command else {
+            panic!("expected the tts subcommand");
+        };
+        assert_eq!(args.lang, "id");
+        assert_eq!(args.voice.as_deref(), Some("supertonic-M2"));
+        assert_eq!(args.engine.as_deref(), Some("local"));
+        assert_eq!(args.speed, 1.2);
+        assert_eq!(args.steps, 16);
+        assert_eq!(args.seed.as_deref(), Some("storm"));
+        assert_eq!(args.style.as_deref(), Some("F1"));
+        assert_eq!(args.prosody, "flat");
+        assert!(args.no_markup);
+        assert_eq!(args.format.as_deref(), Some("mp3"));
+        assert_eq!(args.channels, 2);
+        assert!(args.json);
+        assert_eq!(args.text.as_deref(), Some("Halo!"));
     }
 }

@@ -32,6 +32,7 @@ use qinari_dsp::events::{cox_events, renewal_events};
 use qinari_dsp::filter::{Biquad, BiquadKind, Svf};
 use qinari_dsp::fx::{Crush, Drive, Tremolo};
 use qinari_dsp::latent::LatentField;
+use qinari_dsp::modal::{Material, ModalBank};
 use qinari_dsp::noise::{
     band_limited_gaussian, noise_burst, noise_burst_attacked, swept_noise, NoiseGen, NoiseKind,
 };
@@ -197,26 +198,15 @@ fn unit_depth(field_value: f32) -> f32 {
     field_value.clamp(0.0, 1.0)
 }
 
-/// Builds the shared latent field for one bed render.
+/// Builds the shared latent field for one bed render, tilted toward
+/// 1/f.
 ///
 /// Every layer of the recipe (bed gain, cutoffs, gust depth, event
 /// rate) reads THIS field, so cross-band envelope correlation and
 /// event/bed co-variation exist by construction
 /// (`DESIGN-REALISM-ENGINE.md` §7). The span is `0..1` (the ±1σ range
-/// of the calibrated field).
-fn bed_latent(recipe: &str, ctx: &RenderContext, corner_hz: f32) -> LatentField {
-    LatentField::new(
-        &mut tagged_rng(recipe, "latent", ctx),
-        ctx.sr as f32,
-        ctx.frames,
-        corner_hz,
-        0.0,
-        1.0,
-    )
-}
-
-/// Builds a tilted variant of the shared latent for recipes whose
-/// motion carries mid-band turbulence (wind wander, fire flicker).
+/// of the calibrated field); the tilt flattens the field's modulation
+/// spectrum so no recipe carries an exactly-periodic gain line.
 fn bed_latent_tilted(recipe: &str, ctx: &RenderContext, corner_hz: f32, tilt: f32) -> LatentField {
     LatentField::tilted(
         &mut tagged_rng(recipe, "latent", ctx),
@@ -255,6 +245,25 @@ fn add_layer(bus: &mut Bus, start: usize, samples: &[f32], gain: f32, pan_from: 
         let pos = pan_from + (pan_to - pan_from) * t;
         bus.add_panned(start + i, pos, &[sample * gain]);
     }
+}
+
+/// Strikes a material bank with a few milliseconds of white noise and
+/// peak-normalizes the ring to 0.7, matching the shaped-noise helpers'
+/// convention so recipes scale it by design levels.
+fn material_strike(rng: &mut Qrng, sr: f32, material: Material, ring_secs: f32) -> Vec<f32> {
+    let bank = ModalBank::material(material, rng);
+    let excitation: Vec<f32> = (0..(0.004 * sr) as usize)
+        .map(|_| rng.next_range(-1.0, 1.0))
+        .collect();
+    let mut strike = bank.strike(sr, &excitation, ring_secs);
+    let peak = strike.iter().fold(0.0_f32, |top, s| top.max(s.abs()));
+    if peak > 1e-9 {
+        let scale = 0.7 / peak;
+        for sample in &mut strike {
+            *sample *= scale;
+        }
+    }
+    strike
 }
 
 /// Renders a sine whose pitch glides from `f0` to `f1` (exponential in
@@ -332,7 +341,7 @@ fn render_rain(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     // One latent field drives the bed gain, the bed cutoff and the
     // droplet rate together (replaces the old 0.07 Hz gust sinusoid and
     // the independent Poisson stream).
-    let latent = bed_latent("rain", ctx, 0.18);
+    let latent = bed_latent_tilted("rain", ctx, 0.18, 0.5);
 
     // Bed: pink noise shaped by the plan's cutoffs, breathing on the
     // shared field.
@@ -463,7 +472,7 @@ fn thunder_rumble(ctx: &RenderContext, sr: f32, distance: f32) -> Vec<f32> {
     let rumble_t60 = 1.6 + 1.4 * distance;
     let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
     let onset_tau = 0.12 + 0.5 * distance;
-    let tail = bed_latent("thunder", ctx, 0.3);
+    let tail = bed_latent_tilted("thunder", ctx, 0.3, 0.45);
     let mut source = NoiseGen::fractal(2.0, tagged_rng("thunder", "rumble", ctx));
     let mut lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
     let mut highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
@@ -818,7 +827,7 @@ static BIRDSONG_PARAMS: &[ParamSpec] = &[
         0.6,
         0.0,
         1.0,
-        "How busy the field is; sets the phrase rate."
+        "How busy the field is; sets the mean phrase rate."
     ),
     spec!(
         variety,
@@ -830,117 +839,215 @@ static BIRDSONG_PARAMS: &[ParamSpec] = &[
     ),
 ];
 
-/// Shape of one song note: an exponential pitch glide from `f0` to `f1`
-/// under a T60 envelope, with optional vibrato layered on top (`vib_depth`
-/// is fractional pitch wobble).
+/// The Podos (1997) performance envelope: trill rate times frequency
+/// bandwidth cannot exceed this (notes/s × Hz). Fast-and-wide songs are
+/// physiologically impossible, so the two are drawn jointly, never
+/// independently.
+const PODOS_RATE_BW_LIMIT: f32 = 50_000.0;
+
+/// Draws a joint (trill rate, bandwidth) pair inside the Podos envelope:
+/// bandwidth first, then the rate ceiling that bandwidth leaves.
+fn podos_draw(rng: &mut Qrng) -> (f32, f32) {
+    let bandwidth = rng.next_range(350.0, 4_250.0);
+    let max_rate = (PODOS_RATE_BW_LIMIT / bandwidth).min(26.0);
+    let rate = rng.next_range(2.5, max_rate.max(3.0));
+    debug_assert!(rate * bandwidth <= PODOS_RATE_BW_LIMIT * 1.001);
+    (rate, bandwidth)
+}
+
+/// One source-filter note: a buzzy syringeal source gliding `f0`→`f1`
+/// through swept vocal-tract formants (Nowicki's helium result: oscine
+/// song is source × filter, so bare sines are structurally wrong).
 struct BirdNote {
+    /// Glide start frequency in hertz.
     f0: f32,
+    /// Glide end frequency in hertz.
     f1: f32,
+    /// Note length in seconds.
     dur: f32,
-    t60: f32,
+    /// Vibrato rate in hertz (0 = none).
     vib_hz: f32,
+    /// Vibrato depth as a fractional pitch wobble.
     vib_depth: f32,
 }
 
-/// Renders one song note as a pitch-gliding sine under a T60 envelope.
-fn bird_note(rng: &mut Qrng, sr: f32, spec: &BirdNote) -> Vec<f32> {
+/// Renders one note: a band-limited sawtooth source under an exponential
+/// glide (with optional vibrato), filtered through three swept SVF
+/// formants whose frequencies track the source, under a short
+/// attack/release envelope. The formant set (ratios, Qs, weights) is
+/// drawn per motif so each song has its own tract shape.
+fn bird_note(
+    rng: &mut Qrng,
+    sr: f32,
+    note: &BirdNote,
+    formants: &[(f32, f32, f32); 3],
+) -> Vec<f32> {
     let two_pi = 2.0 * std::f32::consts::PI;
-    let mut osc = Osc::new(OscKind::Sine, guard_hz(spec.f0, sr), sr, rng);
-    let mut env = Percussive::from_t60(sr, spec.t60);
-    env.trigger();
-    let frames = ((spec.dur.max(1.2 * spec.t60) * sr).ceil() as usize).max(4);
-    let ratio = spec.f1 / spec.f0;
+    let mut source = Osc::new(OscKind::Saw, guard_hz(note.f0, sr), sr, rng);
+    let mut tract = [
+        Svf::new(sr, guard_hz(note.f0 * formants[0].0, sr), formants[0].1),
+        Svf::new(sr, guard_hz(note.f0 * formants[1].0, sr), formants[1].1),
+        Svf::new(sr, guard_hz(note.f0 * formants[2].0, sr), formants[2].1),
+    ];
+    let frames = ((note.dur * sr).ceil() as usize).max(4);
+    let attack = (0.003 * sr) as usize;
+    let release = ((0.25 * note.dur * sr) as usize).max(4);
+    let ratio = note.f1 / note.f0;
     (0..frames)
         .map(|i| {
             let t = i as f32 / sr;
-            let glide = spec.f0 * ratio.powf(t / spec.dur);
-            let wobble = 1.0 + spec.vib_depth * (two_pi * spec.vib_hz * t).sin();
-            osc.set_freq(guard_hz(glide * wobble, sr));
-            osc.process() * env.process()
+            let glide = note.f0 * ratio.powf(t / note.dur);
+            let wobble = 1.0 + note.vib_depth * (two_pi * note.vib_hz * t).sin();
+            let hz = guard_hz(glide * wobble, sr);
+            source.set_freq(hz);
+            let x = source.process();
+            let mut out = 0.0_f32;
+            for (filter, &(ratio, q, weight)) in tract.iter_mut().zip(formants) {
+                filter.set(sr, hz * ratio, q);
+                out += filter.process(x).band * weight;
+            }
+            // Short attack and release so notes click neither on nor off.
+            let edge = if i < attack {
+                i as f32 / attack as f32
+            } else if i + release > frames {
+                (frames - i) as f32 / release as f32
+            } else {
+                1.0
+            };
+            out * edge
         })
         .collect()
 }
 
-/// Builds one song motif: its note samples, the gap after each note, and
-/// its mix weight (trills read softer than staircase calls).
-fn song_motif(songs: &mut Qrng, sr: f32) -> (Vec<Vec<f32>>, Vec<usize>, f32) {
+/// One motif as a template, not samples: the note specs, the gap after
+/// each note, the mix weight, the per-motif formant set, and the jointly
+/// drawn (rate, bandwidth) pair the notes were built inside. Every
+/// repetition re-renders the template with micro-jitter, so nothing in
+/// the field ever repeats verbatim.
+struct MotifSpec {
+    /// Note templates in singing order.
+    notes: Vec<BirdNote>,
+    /// Gap after each note in seconds.
+    gaps: Vec<f32>,
+    /// Mix weight (trills read softer than staircase calls).
+    weight: f32,
+    /// The motif's vocal-tract formants: (ratio over source f, Q, mix).
+    formants: [(f32, f32, f32); 3],
+    /// Trill rate in notes/s (drawn jointly with the bandwidth).
+    rate_hz: f32,
+    /// Frequency bandwidth in hertz the song spans.
+    bandwidth_hz: f32,
+}
+
+/// Builds one song motif: the classic three shapes (staircase, trill,
+/// downslur) with note timing derived from the drawn rate and pitch
+/// spread from the drawn bandwidth — the Podos constraint couples them
+/// by construction.
+fn song_motif(songs: &mut Qrng) -> MotifSpec {
     let kind = songs.next_f32();
-    let base = 2100.0 + songs.next_f32() * 2700.0;
-    let mut notes: Vec<Vec<f32>> = Vec::new();
-    let mut gaps: Vec<usize> = Vec::new();
+    let base = 2_100.0 + songs.next_f32() * 2_700.0;
+    let (rate, bandwidth) = podos_draw(songs);
+    let period = 1.0 / rate;
+    // The tract: three formants at 1–3.4× the source, each motif's own.
+    let formants = [
+        (songs.next_range(1.0, 1.3), songs.next_range(4.0, 8.0), 1.0),
+        (
+            songs.next_range(1.8, 2.6),
+            songs.next_range(5.0, 10.0),
+            songs.next_range(0.5, 1.0),
+        ),
+        (
+            songs.next_range(2.8, 3.6),
+            songs.next_range(6.0, 12.0),
+            songs.next_range(0.2, 0.6),
+        ),
+    ];
+    let mut notes: Vec<BirdNote> = Vec::new();
+    let mut gaps: Vec<f32> = Vec::new();
     let weight;
     if kind < 0.38 {
-        // Staircase: 3-7 short rising glides, each a step higher.
+        // Staircase: 3-7 rising steps spanning the drawn bandwidth.
         weight = 1.0;
         let steps = 3 + songs.next_int_range(0, 4) as usize;
         for s in 0..steps {
-            let f0 = base * (1.0 + 0.14 * s as f32);
-            let f1 = f0 * (1.18 + songs.next_f32() * 0.55);
-            let dur = 0.05 + songs.next_f32() * 0.07;
-            let t60 = 0.07 + songs.next_f32() * 0.05;
-            notes.push(bird_note(
-                songs,
-                sr,
-                &BirdNote {
-                    f0,
-                    f1,
-                    dur,
-                    t60,
-                    vib_hz: 0.0,
-                    vib_depth: 0.0,
-                },
-            ));
-            gaps.push(((0.08 + songs.next_f32() * 0.1) * sr) as usize);
+            let f0 = base + bandwidth * s as f32 / steps as f32;
+            let f1 = f0 + bandwidth / steps as f32;
+            notes.push(BirdNote {
+                f0,
+                f1,
+                dur: 0.55 * period,
+                vib_hz: 0.0,
+                vib_depth: 0.0,
+            });
+            gaps.push(0.45 * period);
         }
     } else if kind < 0.7 {
-        // Trill: 10-24 fast ticks on a slowly rising pitch.
+        // Trill: fast ticks — the drawn rate is high, so the Podos draw
+        // already forced the bandwidth narrow.
         weight = 0.55;
         let ticks = 10 + songs.next_int_range(0, 14) as usize;
-        let step = 55.0 + songs.next_f32() * 110.0;
         for s in 0..ticks {
-            let f0 = base + step * s as f32;
-            let f1 = f0 * (1.1 + songs.next_f32() * 0.18);
-            let dur = 0.026 + songs.next_f32() * 0.02;
-            let t60 = 0.03 + songs.next_f32() * 0.015;
-            notes.push(bird_note(
-                songs,
-                sr,
-                &BirdNote {
-                    f0,
-                    f1,
-                    dur,
-                    t60,
-                    vib_hz: 0.0,
-                    vib_depth: 0.0,
-                },
-            ));
-            gaps.push(((0.03 + songs.next_f32() * 0.025) * sr) as usize);
+            let f0 = base + bandwidth * s as f32 / ticks as f32;
+            notes.push(BirdNote {
+                f0,
+                f1: f0 + bandwidth / ticks as f32,
+                dur: 0.6 * period,
+                vib_hz: 0.0,
+                vib_depth: 0.0,
+            });
+            gaps.push(0.4 * period);
         }
     } else {
-        // Downslur call: 2-4 long falling notes with a soft vibrato.
+        // Downslur: 2-4 long falling calls with vibrato, wide only when
+        // the rate drawn for them is slow.
         weight = 0.8;
         let calls = 2 + songs.next_int_range(0, 2) as usize;
-        for s in 0..calls {
-            let f0 = base * (1.0 - 0.18 * s as f32);
-            let f1 = f0 * (0.5 + songs.next_f32() * 0.28);
-            let dur = 0.16 + songs.next_f32() * 0.1;
-            let vib_hz = 16.0 + songs.next_f32() * 12.0;
-            notes.push(bird_note(
-                songs,
-                sr,
-                &BirdNote {
-                    f0,
-                    f1,
-                    dur,
-                    t60: 0.13,
-                    vib_hz,
-                    vib_depth: 0.02,
-                },
-            ));
-            gaps.push(((0.14 + songs.next_f32() * 0.1) * sr) as usize);
+        for _ in 0..calls {
+            let f0 = base + bandwidth * 0.5;
+            let f1 = (base - bandwidth * 0.5).max(900.0);
+            notes.push(BirdNote {
+                f0,
+                f1,
+                dur: 1.6 * period,
+                vib_hz: 16.0 + songs.next_f32() * 12.0,
+                vib_depth: 0.02,
+            });
+            gaps.push(0.8 * period);
         }
     }
-    (notes, gaps, weight)
+    MotifSpec {
+        notes,
+        gaps,
+        weight,
+        formants,
+        rate_hz: rate,
+        bandwidth_hz: bandwidth,
+    }
+}
+
+/// Renders one occurrence of a motif with micro-jitter: ±3% pitch and
+/// ±8% timing per repetition (real bouts repeat motifs with
+/// micro-variation), returning per-note samples and their start offsets
+/// in seconds relative to the phrase start.
+fn motif_occurrence(rng: &mut Qrng, sr: f32, motif: &MotifSpec) -> Vec<(usize, Vec<f32>)> {
+    let pitch = 1.0 + rng.next_range(-0.03, 0.03);
+    let mut out = Vec::with_capacity(motif.notes.len());
+    let mut cursor = 0.0_f32;
+    for note in &motif.notes {
+        let jittered = BirdNote {
+            f0: note.f0 * pitch,
+            f1: note.f1 * pitch,
+            dur: note.dur * (1.0 + rng.next_range(-0.04, 0.04)),
+            vib_hz: note.vib_hz,
+            vib_depth: note.vib_depth,
+        };
+        out.push((
+            (cursor * sr) as usize,
+            bird_note(rng, sr, &jittered, &motif.formants),
+        ));
+        cursor += jittered.dur + motif.gaps[out.len() - 1] * (1.0 + rng.next_range(-0.08, 0.08));
+    }
+    out
 }
 
 fn render_birdsong(ctx: &RenderContext) -> Result<AudioBuffer, String> {
@@ -949,34 +1056,51 @@ fn render_birdsong(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let variety = ctx.params.get("variety") as f32;
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
-    // Songs: each motif is built once and reused verbatim — real birds
-    // repeat their tune, so the field hears a handful of distinct songs.
+    // The singer's repertoire: motif templates, built once per render.
     let mut songs = tagged_rng("birdsong", "songs", ctx);
     let song_count = 1 + (variety * 5.0).round() as usize;
-    let mut motifs: Vec<(Vec<Vec<f32>>, Vec<usize>, f32)> = Vec::new();
-    for _ in 0..song_count {
-        motifs.push(song_motif(&mut songs, sr));
-    }
+    let motifs: Vec<MotifSpec> = (0..song_count).map(|_| song_motif(&mut songs)).collect();
 
-    // Phrases: the field always opens with one phrase, then more bursts
-    // arrive as a Poisson stream; the singer drifts around the stereo
-    // field between phrases.
+    // Phrase field: a Cox process — the phrase rate rides a tilted
+    // latent field, so bursts cluster and lull like real singing instead
+    // of the metronome Poisson stream this replaces.
+    let mut latent_rng = tagged_rng("birdsong", "latent", ctx);
+    let latent = LatentField::tilted(&mut latent_rng, sr, ctx.frames, 0.25, 0.35, 0.3, 1.7);
     let mut field = tagged_rng("birdsong", "field", ctx);
     let rate = 0.08 + 0.55 * activity;
-    let mut events = poisson_events(&mut field, ctx.frames, ctx.sr, rate);
+    let mut events = cox_events(&mut field, ctx.frames, ctx.sr, rate, |frame| {
+        latent.value_at(frame)
+    });
     let opening = (field.next_range(0.15, 0.85) * sr) as usize;
     events.push(opening);
     events.sort_unstable();
-    let mut pan = 0.0f32;
+
+    // The singer works through the repertoire with a small transition
+    // matrix — mostly repeat the current motif (species syntax),
+    // sometimes switch — and every repetition is re-rendered with
+    // micro-jitter, so the same tune never repeats verbatim.
+    let mut jitter = tagged_rng("birdsong", "jitter", ctx);
+    let mut current = field.next_int_range(0, (motifs.len() - 1) as u64) as usize;
+    let mut pan = 0.0_f32;
     for &at in &events {
-        let pick = field.next_int_range(0, (motifs.len() - 1) as u64) as usize;
-        let (notes, gaps, weight) = &motifs[pick];
+        if motifs.len() > 1 && field.next_f32() < 0.35 {
+            let mut next = current;
+            while next == current {
+                next = field.next_int_range(0, (motifs.len() - 1) as u64) as usize;
+            }
+            current = next;
+        }
+        let motif = &motifs[current];
+        // The joint draw is enforced at render time too, not just in
+        // tests: no fast-and-wide song may ever reach the field.
+        debug_assert!(
+            motif.rate_hz * motif.bandwidth_hz <= PODOS_RATE_BW_LIMIT * 1.001,
+            "motif outside the Podos envelope"
+        );
         pan = (pan + field.next_range(-0.35, 0.35)).clamp(-0.8, 0.8);
-        let level = (0.11 + 0.1 * field.next_f32()) * weight;
-        let mut cursor = at;
-        for (note, gap) in notes.iter().zip(gaps) {
-            add_layer(&mut bus, cursor, note, level, pan, pan);
-            cursor += *gap;
+        let level = (0.11 + 0.1 * field.next_f32()) * motif.weight;
+        for (offset, note) in motif_occurrence(&mut jitter, sr, motif) {
+            add_layer(&mut bus, at + offset, &note, level, pan, pan);
         }
     }
 
@@ -1083,7 +1207,7 @@ fn render_explosion(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     // locked to the body, tail driven by the latent field.
     let rumble_t60 = 1.0 + 1.8 * size + 0.8 * distance;
     let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
-    let tail = bed_latent("explosion", ctx, 0.25);
+    let tail = bed_latent_tilted("explosion", ctx, 0.25, 0.45);
     let mut blast_source = NoiseGen::fractal(2.0, tagged_rng("explosion", "rumble", ctx));
     let mut blast_lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
     let mut blast_highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
@@ -1122,18 +1246,29 @@ fn render_explosion(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     Ok(out)
 }
 
-static IMPACT_PARAMS: &[ParamSpec] = &[spec!(
-    intensity,
-    Float,
-    0.6,
-    0.0,
-    1.0,
-    "Impact strength; raises thump and slap levels."
-)];
+static IMPACT_PARAMS: &[ParamSpec] = &[
+    spec!(
+        intensity,
+        Float,
+        0.6,
+        0.0,
+        1.0,
+        "Impact strength; raises thump and slap levels."
+    ),
+    spec!(
+        material,
+        Int,
+        0.0,
+        0.0,
+        3.0,
+        "Struck material: 0=wood, 1=metal, 2=ceramic, 3=thud."
+    ),
+];
 
 fn render_impact(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let sr = ctx.sr as f32;
     let intensity = ctx.params.get("intensity") as f32;
+    let material = Material::ALL[(ctx.params.get("material").clamp(0.0, 3.0) as usize).min(3)];
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
     let thump = sub_sweep(
@@ -1154,16 +1289,11 @@ fn render_impact(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     );
     add_layer(&mut bus, 0, &slap, 0.55 + 0.25 * intensity, 0.0, 0.05);
 
-    // Body: a short enveloped wash under the transient.
-    let body_frames = (0.4 * sr) as usize;
-    let mut body = NoiseGen::new(NoiseKind::Pink, tagged_rng("impact", "body", ctx));
-    let mut body_lp = Biquad::design(BiquadKind::Lowpass, sr, 700.0, BUTTERWORTH, 0.0);
-    let mut body_env = Percussive::from_t60(sr, 0.3);
-    body_env.trigger();
-    let body_samples: Vec<f32> = (0..body_frames)
-        .map(|_| body_lp.process(body.process()) * body_env.process() * 0.2)
-        .collect();
-    add_layer(&mut bus, 0, &body_samples, 1.0, 0.0, 0.0);
+    // Body: the struck object rings as a modal bank (van den Doel &
+    // Pai) — the pink-noise wash this replaces had no spectral fine
+    // structure at all.
+    let body = material_strike(&mut tagged_rng("impact", "body", ctx), sr, material, 0.9);
+    add_layer(&mut bus, 0, &body, 0.35 + 0.4 * intensity, 0.0, 0.0);
 
     // A soft sigh of air after the hit.
     let sigh = swept_noise(
@@ -1263,26 +1393,22 @@ fn render_sword(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     );
     add_layer(&mut bus, 0, &whoosh, 0.55, -0.7, 0.6);
 
-    // Two detuned Karplus-Strong strings give the metal.
-    let mut metal = tagged_rng("sword", "metal", ctx);
-    let base = guard_hz(1900.0 + metal.next_f32() * 700.0, sr);
-    let ring_a = qinari_dsp::karplus::pluck(sr, base, 0.9, &mut metal);
-    add_layer(
-        &mut bus,
-        (0.16 * sr) as usize,
-        &ring_a,
-        0.22 * ring,
-        -0.15,
-        0.25,
+    // Metal ring: a modal metal bank struck at contact (van den Doel &
+    // Pai) — inharmonic bell-family partials replace the two bare
+    // Karplus-Strong strings.
+    let ring_samples = material_strike(
+        &mut tagged_rng("sword", "metal", ctx),
+        sr,
+        Material::Metal,
+        1.4,
     );
-    let ring_b = qinari_dsp::karplus::pluck(sr, base * 1.98, 0.7, &mut metal);
     add_layer(
         &mut bus,
         (0.16 * sr) as usize,
-        &ring_b,
-        0.12 * ring,
-        0.25,
+        &ring_samples,
+        0.42 * ring,
         -0.15,
+        0.25,
     );
 
     let mut out = bus.buffer();
@@ -1290,10 +1416,18 @@ fn render_sword(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     Ok(out)
 }
 
-static HIT_PARAMS: &[ParamSpec] = &[];
+static HIT_PARAMS: &[ParamSpec] = &[spec!(
+    material,
+    Int,
+    3.0,
+    0.0,
+    3.0,
+    "Struck material: 0=wood, 1=metal, 2=ceramic, 3=thud."
+)];
 
 fn render_hit(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let sr = ctx.sr as f32;
+    let material = Material::ALL[(ctx.params.get("material").clamp(0.0, 3.0) as usize).min(3)];
     let mut bus = Bus::new(ctx.channels, ctx.frames, ctx.sr);
 
     let punch = sub_sweep(
@@ -1309,15 +1443,10 @@ fn render_hit(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let slap = noise_burst(sr, &mut tagged_rng("hit", "slap", ctx), 3800.0, 0.012);
     add_layer(&mut bus, 0, &slap, 0.5, 0.0, 0.0);
 
-    let body_frames = (0.35 * sr) as usize;
-    let mut body = NoiseGen::new(NoiseKind::Pink, tagged_rng("hit", "body", ctx));
-    let mut body_lp = Biquad::design(BiquadKind::Lowpass, sr, 600.0, BUTTERWORTH, 0.0);
-    let mut body_env = Percussive::from_t60(sr, 0.28);
-    body_env.trigger();
-    let body_samples: Vec<f32> = (0..body_frames)
-        .map(|_| body_lp.process(body.process()) * body_env.process() * 0.22)
-        .collect();
-    add_layer(&mut bus, 0, &body_samples, 1.0, 0.0, 0.0);
+    // Body: the struck object's modal ring (thud by default — a body
+    // hit is dull; switch material for wood/metal/ceramic strikes).
+    let body = material_strike(&mut tagged_rng("hit", "body", ctx), sr, material, 0.6);
+    add_layer(&mut bus, 0, &body, 0.45, 0.0, 0.0);
 
     let mut out = bus.buffer();
     fade_edges(&mut out, ctx.sr, 0.0, 10.0);
@@ -2062,9 +2191,9 @@ fn render_footsteps(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let mut t = 0.0f32;
     while t < duration {
         let at = (t * sr) as usize;
-        let thud_cutoff = 750.0 + rng.next_f32() * 700.0;
-        let thud_decay = 0.045 + rng.next_f32() * 0.035;
-        let thud = noise_burst(sr, &mut rng, thud_cutoff, thud_decay);
+        // Each footfall strikes a thud modal bank — a dull, heavily
+        // damped object, jittered per step (van den Doel & Pai).
+        let thud = material_strike(&mut rng, sr, Material::Thud, 0.16);
         let level = 0.3 + 0.2 * rng.next_f32();
         let pos = if step % 2 == 0 {
             -0.4 + rng.next_f32() * 0.15
@@ -2434,5 +2563,146 @@ mod tests {
         );
         let exact = suggest_recipe("heartbeat", 3);
         assert_eq!(exact.first(), Some(&"heartbeat"));
+    }
+
+    fn recipes_rng(tag: &str) -> Qrng {
+        Qrng::from_seed(Seed::from_text(tag))
+    }
+
+    #[test]
+    fn podos_draws_stay_inside_the_performance_envelope() {
+        let mut rng = recipes_rng("podos-envelope");
+        for _ in 0..500 {
+            let (rate, bandwidth) = podos_draw(&mut rng);
+            assert!(
+                rate * bandwidth <= PODOS_RATE_BW_LIMIT * 1.0001,
+                "rate {rate} Hz × bandwidth {bandwidth} Hz exceeds the Podos limit"
+            );
+            // The tradeoff itself: no fast-and-wide songs exist.
+            if rate > 15.0 {
+                assert!(
+                    bandwidth < PODOS_RATE_BW_LIMIT / 15.0,
+                    "fast ({rate} Hz) and wide ({bandwidth} Hz) at once"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn motifs_couple_timing_and_pitch_to_the_podos_draw() {
+        let mut rng = recipes_rng("motif-coupling");
+        for _ in 0..50 {
+            let motif = song_motif(&mut rng);
+            assert!(!motif.notes.is_empty());
+            assert_eq!(motif.notes.len(), motif.gaps.len());
+            // Timing derives from the drawn rate: staircase and trill
+            // inter-onset intervals land on the period; downslur calls
+            // span a couple of periods by design. Everything stays
+            // period-quantized — no free-running durations.
+            let period = 1.0 / motif.rate_hz;
+            for (note, gap) in motif.notes.iter().zip(&motif.gaps) {
+                let inter_onset = note.dur + gap;
+                assert!(
+                    (0.8..=2.6).contains(&(inter_onset / period)),
+                    "inter-onset {inter_onset} is not period-derived (period {period})"
+                );
+            }
+            // Pitch spread derives from the drawn bandwidth.
+            let f_max = motif
+                .notes
+                .iter()
+                .map(|n| n.f0.max(n.f1))
+                .fold(f32::MIN, f32::max);
+            let f_min = motif
+                .notes
+                .iter()
+                .map(|n| n.f0.min(n.f1))
+                .fold(f32::MAX, f32::min);
+            assert!(
+                f_max - f_min <= motif.bandwidth_hz * 1.35,
+                "span {} vs drawn bandwidth {}",
+                f_max - f_min,
+                motif.bandwidth_hz
+            );
+            assert!(
+                motif.rate_hz * motif.bandwidth_hz <= PODOS_RATE_BW_LIMIT * 1.0001,
+                "the stored pair must satisfy the envelope"
+            );
+        }
+    }
+
+    #[test]
+    fn motif_repetitions_differ_under_micro_jitter() {
+        let mut songs = recipes_rng("jitter-songs");
+        let motif = song_motif(&mut songs);
+        let sr = 44_100.0_f32;
+        let mut left_stream = recipes_rng("occurrence-a");
+        let mut right_stream = recipes_rng("occurrence-b");
+        let first = motif_occurrence(&mut left_stream, sr, &motif);
+        let second = motif_occurrence(&mut right_stream, sr, &motif);
+        assert_eq!(first.len(), second.len(), "same motif, same note count");
+        // The acceptance target: repetitions are never verbatim. Compare
+        // the longest note's audio; pitch jitter (±3%) walks the phase,
+        // so the normalized correlation must sit below 1 within
+        // tolerance.
+        let pick = first
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, (_, samples))| samples.len())
+            .map(|(i, _)| i)
+            .unwrap();
+        let left_note = &first[pick].1;
+        let right_note = &second[pick].1;
+        let overlap = left_note.len().min(right_note.len());
+        let dot: f32 = left_note[..overlap]
+            .iter()
+            .zip(&right_note[..overlap])
+            .map(|(s, t)| s * t)
+            .sum();
+        let left_energy: f32 = left_note[..overlap].iter().map(|s| s * s).sum();
+        let right_energy: f32 = right_note[..overlap].iter().map(|s| s * s).sum();
+        let corr = dot / (left_energy * right_energy).sqrt();
+        assert!(
+            corr.is_finite() && corr < 0.999_5,
+            "repetitions must differ (correlation {corr})"
+        );
+        // Determinism holds: the same jitter stream renders identical
+        // bytes.
+        let mut replay = recipes_rng("occurrence-a");
+        let again = motif_occurrence(&mut replay, sr, &motif);
+        for ((_, left), (_, right)) in first.iter().zip(&again) {
+            assert_eq!(left, right);
+        }
+    }
+
+    #[test]
+    fn bird_notes_are_source_filtered_not_bare_sines() {
+        // The v1 note was a bare sine: zero energy at any harmonic. The
+        // v2 source-filter note drives a sawtooth through formants, so
+        // the second harmonic must carry real energy (Goertzel reads a
+        // flat note at its fundamental and second harmonic).
+        let mut rng = recipes_rng("note-shape");
+        let formants = [(1.1, 6.0, 1.0), (2.2, 8.0, 0.7), (3.1, 10.0, 0.4)];
+        let note = BirdNote {
+            f0: 3_000.0,
+            f1: 3_000.0,
+            dur: 0.09,
+            vib_hz: 0.0,
+            vib_depth: 0.0,
+        };
+        let samples = bird_note(&mut rng, 48_000.0, &note, &formants);
+        assert!(samples.len() > 3_000);
+        assert!(samples.iter().all(|s| s.is_finite()));
+        let fundamental = goertzel_magnitude(&samples, 3_000.0, 48_000.0);
+        let harmonic = goertzel_magnitude(&samples, 6_000.0, 48_000.0);
+        assert!(
+            fundamental > 0.05,
+            "the note must ring at its source frequency (read {fundamental})"
+        );
+        assert!(
+            harmonic / fundamental > 0.04,
+            "source-filter note must carry harmonic energy (h2/f0 = {}); a bare sine reads 0",
+            harmonic / fundamental
+        );
     }
 }

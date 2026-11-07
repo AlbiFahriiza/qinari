@@ -1628,6 +1628,32 @@ fn print_analyze_json(
             "pause_rate_per_min": speech.pauses.rate_per_min,
         })
     });
+    // The realism section rides the same full report: the periodic-gain
+    // detector, interaural correlation bands, and event statistics the
+    // benchmark tables and golden gates read.
+    let realism = report.map(|report| {
+        // Line share: the fraction of the 0–20 Hz gain-modulation
+        // spectrum's normalized energy sitting in its peak bin. A pure
+        // sinusoid AM reads ~1.0 (a spectral line); a latent-driven bed
+        // spreads the same energy across bins and reads far lower.
+        let spectrum = &report.modulation.gain_spectrum_0_20hz;
+        let sum: f64 = spectrum.iter().sum();
+        let line_share = if sum > 0.0 { 1.0 / sum } else { 0.0 };
+        serde_json::json!({
+            "gain_peak_mean_ratio": report.modulation.gain_peak_mean_ratio,
+            "gain_peak_hz": report.modulation.gain_peak_hz,
+            "gain_line_share": line_share,
+            "interaural": report.interaural.as_ref().map(|interaural| serde_json::json!({
+                "b0_500": interaural.b0_500,
+                "b500_2000": interaural.b500_2000,
+                "b2000_8000": interaural.b2000_8000,
+                "b8000_nyquist": interaural.b8000_nyquist,
+            })),
+            "event_count": report.events.count,
+            "event_rate_hz": report.events.rate_hz,
+            "event_interval_cv": report.events.interval_cv,
+        })
+    });
     let mut json = serde_json::json!({
         "file": file.display().to_string(),
         "duration_s": buffer.duration(),
@@ -1637,6 +1663,7 @@ fn print_analyze_json(
         "peak_dbfs": linear_to_db(buffer.peak()),
         "rms_dbfs": linear_to_db(buffer.rms()),
         "speech": speech,
+        "realism": realism,
     });
     if let Some(scores) = scores {
         json["dnsmos"] = serde_json::json!({

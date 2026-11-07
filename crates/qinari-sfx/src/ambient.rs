@@ -9,13 +9,14 @@
 //! bit-identical audio.
 
 use qinari_dsp::buffer::AudioBuffer;
-use qinari_dsp::osc::fast_sine;
+use qinari_dsp::events::cox_events;
+use qinari_dsp::latent::LatentField;
 use qinari_dsp::rng::{Qrng, Seed};
 use strsim::levenshtein;
 use thiserror::Error;
 
 use crate::params::ParamSet;
-use crate::recipes::{find_recipe, poisson_events, seconds_to_frames, RenderContext};
+use crate::recipes::{find_recipe, seconds_to_frames, RenderContext};
 use crate::SfxError;
 
 /// Errors raised while rendering an ambient preset.
@@ -53,12 +54,10 @@ pub struct AmbientLayer {
     pub params: &'static [(&'static str, f64)],
     /// Base layer gain (before motion).
     pub gain: f32,
-    /// Gain-motion rate in hertz.
+    /// Gain-motion timescale in hertz (the latent field's corner).
     pub motion_rate_hz: f32,
     /// How far the gain swings with the motion (0 = steady).
     pub motion_depth: f32,
-    /// Motion phase offset in turns (0..1).
-    pub motion_phase: f32,
     /// Expected one-shot events per minute; 0 for a bed layer.
     ///
     /// Event layers must use short one-shot recipes: a bed recipe would
@@ -88,7 +87,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.85,
                 motion_rate_hz: 0.05,
                 motion_depth: 0.3,
-                motion_phase: 0.1,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -97,7 +95,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.5,
                 motion_rate_hz: 0.03,
                 motion_depth: 0.4,
-                motion_phase: 0.55,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -106,7 +103,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.8,
                 motion_rate_hz: 0.04,
                 motion_depth: 0.25,
-                motion_phase: 0.0,
                 events_per_minute: 1.6,
             },
             AmbientLayer {
@@ -115,7 +111,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.55,
                 motion_rate_hz: 0.03,
                 motion_depth: 0.25,
-                motion_phase: 0.5,
                 events_per_minute: 4.0,
             },
         ],
@@ -130,7 +125,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.9,
                 motion_rate_hz: 0.02,
                 motion_depth: 0.15,
-                motion_phase: 0.0,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -139,7 +133,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.45,
                 motion_rate_hz: 0.04,
                 motion_depth: 0.35,
-                motion_phase: 0.3,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -148,7 +141,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.22,
                 motion_rate_hz: 0.05,
                 motion_depth: 0.45,
-                motion_phase: 0.8,
                 events_per_minute: 0.0,
             },
         ],
@@ -163,7 +155,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.95,
                 motion_rate_hz: 0.03,
                 motion_depth: 0.25,
-                motion_phase: 0.0,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -172,7 +163,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.5,
                 motion_rate_hz: 0.045,
                 motion_depth: 0.3,
-                motion_phase: 0.45,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -181,7 +171,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.4,
                 motion_rate_hz: 0.05,
                 motion_depth: 0.4,
-                motion_phase: 0.7,
                 events_per_minute: 0.0,
             },
         ],
@@ -196,7 +185,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.6,
                 motion_rate_hz: 0.08,
                 motion_depth: 0.2,
-                motion_phase: 0.0,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -205,7 +193,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.38,
                 motion_rate_hz: 0.06,
                 motion_depth: 0.3,
-                motion_phase: 0.6,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -214,7 +201,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.5,
                 motion_rate_hz: 0.04,
                 motion_depth: 0.2,
-                motion_phase: 0.2,
                 events_per_minute: 0.8,
             },
             AmbientLayer {
@@ -223,7 +209,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.42,
                 motion_rate_hz: 0.03,
                 motion_depth: 0.25,
-                motion_phase: 0.9,
                 events_per_minute: 1.1,
             },
         ],
@@ -238,7 +223,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.8,
                 motion_rate_hz: 0.03,
                 motion_depth: 0.3,
-                motion_phase: 0.15,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -247,7 +231,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.3,
                 motion_rate_hz: 0.05,
                 motion_depth: 0.35,
-                motion_phase: 0.65,
                 events_per_minute: 0.0,
             },
             AmbientLayer {
@@ -256,7 +239,6 @@ static PRESETS: [AmbientPreset; 5] = [
                 gain: 0.42,
                 motion_rate_hz: 0.04,
                 motion_depth: 0.28,
-                motion_phase: 0.4,
                 events_per_minute: 0.0,
             },
         ],
@@ -309,8 +291,28 @@ pub fn render_ambient(
     }
     let frames = seconds_to_frames(secs, sr);
     let mut master = AudioBuffer::new(ch, frames, sr);
+    // One shared latent field per preset: every layer's swell and every
+    // event stream rides it, so layers co-vary and events cluster with
+    // the swells. The periodic sinusoid motion this replaces put an
+    // exact spectral line under every ambient render.
+    let corner = found
+        .layers
+        .iter()
+        .map(|layer| layer.motion_rate_hz)
+        .sum::<f32>()
+        / found.layers.len() as f32;
+    let mut field_rng = Qrng::from_seed(Seed::from_text(&format!("{}:field:{seed}", found.id)));
+    let field = LatentField::tilted(
+        &mut field_rng,
+        master.sample_rate() as f32,
+        master.frames(),
+        corner.max(0.01),
+        0.5,
+        0.0,
+        1.0,
+    );
     for (index, layer) in found.layers.iter().enumerate() {
-        render_layer(&mut master, found, index, layer, seed)?;
+        render_layer(&mut master, found, index, layer, &field, seed)?;
     }
     Ok(master)
 }
@@ -325,6 +327,7 @@ fn render_layer(
     preset: &'static AmbientPreset,
     index: usize,
     layer: &AmbientLayer,
+    field: &LatentField,
     seed: u64,
 ) -> Result<(), AmbientError> {
     let recipe = find_recipe(layer.recipe).ok_or_else(|| {
@@ -345,11 +348,14 @@ fn render_layer(
         let mut stream = Qrng::from_seed(Seed::from_text(&layer_seed_text(
             preset.id, index, "events", seed,
         )));
-        let events = poisson_events(
+        // The event stream is a Cox process on the shared field: hits
+        // cluster in the swells instead of ticking metronome-Poisson.
+        let events = cox_events(
             &mut stream,
             master.frames(),
             sr,
             layer.events_per_minute / 60.0,
+            |frame| 0.5 + field.value_at(frame),
         );
         let window = (EVENT_WINDOW_SECS * sr as f32) as usize;
         for (hit, &at) in events.iter().enumerate() {
@@ -371,8 +377,7 @@ fn render_layer(
                 frames,
             };
             let rendered = (recipe.render)(&context).map_err(AmbientError::Render)?;
-            let t = at as f32 / sr as f32;
-            let swell = 0.5 + 0.5 * fast_sine(t * layer.motion_rate_hz + layer.motion_phase);
+            let swell = field.value_at(at);
             let gain = layer.gain * (1.0 - layer.motion_depth + layer.motion_depth * swell);
             mix_at(master, &rendered, at, gain);
         }
@@ -385,7 +390,7 @@ fn render_layer(
             frames: master.frames(),
         };
         let rendered = (recipe.render)(&context).map_err(AmbientError::Render)?;
-        apply_motion(master, &rendered, layer, sr);
+        apply_motion(master, &rendered, layer, field);
     }
     Ok(())
 }
@@ -395,12 +400,11 @@ fn apply_motion(
     master: &mut AudioBuffer,
     layer_buffer: &AudioBuffer,
     layer: &AmbientLayer,
-    sr: u32,
+    field: &LatentField,
 ) {
     let frames = master.frames().min(layer_buffer.frames());
     for frame in 0..frames {
-        let t = frame as f32 / sr as f32;
-        let swell = 0.5 + 0.5 * fast_sine(t * layer.motion_rate_hz + layer.motion_phase);
+        let swell = field.value_at(frame);
         let gain = layer.gain * (1.0 - layer.motion_depth + layer.motion_depth * swell);
         for channel in 0..master.num_channels() {
             let value = layer_buffer.get(channel, frame) * gain;
@@ -471,6 +475,11 @@ mod tests {
 
     #[test]
     fn motion_gain_swings_between_steady_and_full_depth() {
+        // A shared field for the test: corner 1 Hz over 1 s so the swell
+        // genuinely traverses its range inside the window.
+        let mut rng = Qrng::from_seed(Seed::from_text("ambient-motion-test"));
+        let field = LatentField::tilted(&mut rng, 48_000.0, 48_000, 1.0, 0.5, 0.0, 1.0);
+
         // Depth 0: the gain is the base gain everywhere.
         let layer = AmbientLayer {
             recipe: "rain",
@@ -478,19 +487,20 @@ mod tests {
             gain: 0.5,
             motion_rate_hz: 0.1,
             motion_depth: 0.0,
-            motion_phase: 0.0,
             events_per_minute: 0.0,
         };
         let mut master = AudioBuffer::new(2, 4800, 48_000);
         let flat =
             AudioBuffer::from_channels(vec![vec![1.0; 4800], vec![1.0; 4800]], 48_000).unwrap();
-        apply_motion(&mut master, &flat, &layer, 48_000);
+        apply_motion(&mut master, &flat, &layer, &field);
         for frame in 0..4800 {
             assert!((master.get(0, frame) - 0.5).abs() < 1e-6);
             assert!((master.get(1, frame) - 0.5).abs() < 1e-6);
         }
 
-        // Depth 1 at 1 Hz: the gain sweeps from 0 to the base gain.
+        // Depth 1: the gain follows the field, swinging across its
+        // range over the second — the swell moves and stays around the
+        // base gain on average.
         let mut master = AudioBuffer::new(2, 48_000, 48_000);
         let flat =
             AudioBuffer::from_channels(vec![vec![1.0; 48_000], vec![1.0; 48_000]], 48_000).unwrap();
@@ -500,16 +510,16 @@ mod tests {
             gain: 0.5,
             motion_rate_hz: 1.0,
             motion_depth: 1.0,
-            motion_phase: 0.0,
             events_per_minute: 0.0,
         };
-        apply_motion(&mut master, &flat, &deep, 48_000);
-        let peak = master.peak();
-        assert!(peak > 0.47, "peak {peak}");
-        // m is near zero around t = 0.75 s (frame 36 000).
-        let quiet = &master.channels()[0][34_000..38_000];
-        let min = quiet.iter().fold(f32::INFINITY, |m, &s| m.min(s));
-        assert!(min < 0.02, "quiet stretch stayed at {min}");
+        apply_motion(&mut master, &flat, &deep, &field);
+        let channel = &master.channels()[0];
+        let peak = channel.iter().fold(0.0_f32, |top, &s| top.max(s));
+        let min = channel.iter().fold(f32::INFINITY, |low, &s| low.min(s));
+        assert!(peak > 0.3, "the swell must reach high ({peak})");
+        assert!(min < 0.1, "the swell must reach low ({min})");
+        let mean = channel.iter().sum::<f32>() / channel.len() as f32;
+        assert!((0.1..=0.6).contains(&mean), "mean gain {mean}");
     }
 
     #[test]

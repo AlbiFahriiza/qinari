@@ -32,6 +32,7 @@ pub mod karplus;
 pub mod latent;
 pub mod lfo;
 pub mod lufs;
+pub mod modal;
 pub mod noise;
 pub mod osc;
 pub mod pan;

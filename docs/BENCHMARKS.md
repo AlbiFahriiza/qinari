@@ -123,3 +123,53 @@ six times sooner.
 | G8 mastering | ± 1.0 LU of target | 0.0 LU | pass |
 | G8 ceiling | peak ≤ ceiling | exactly at ceiling (−1.0 / −0.5 dBFS), transients included | pass |
 | G12 documented comparison | measured 30 s vs numpy | table above | pass |
+
+## Realism migration — before/after (0.1.5)
+
+Method: the same renders (fixed seed `realism-bench`, 20 s stereo 44.1
+kHz, default parameters; explosion/impact/sword 6/3/3 s) from the
+pre-realism tree (`9cf1736`, binary built from that commit) and the
+current tree, analyzed with the current `qinari analyze --json`.
+Metrics: **gain peak/mean** and **gain line share** of the 0–20 Hz gain
+modulation spectrum (an exactly-periodic amplitude line reads a huge
+peak/mean and a line share near 1.0), **interaural correlation** above
+500 Hz (worst of the 0.5–2 kHz and 2–8 kHz bands; 1.0 = the hard
+synthetic tell), and the **interval CV** of detected events.
+
+| recipe | gain peak/mean (before → after) | gain line share | interaural > 500 Hz | event CV |
+| --- | --- | --- | --- | --- |
+| rain | 207.1 → **96.0** | 0.25 → **0.14** | 0.960 → **0.303** | 0.89 → 0.81 |
+| wind | 358.6 → **96.3** | 0.35 → **0.18** | 1.000 → **0.458** | — → — |
+| fire | 64.1 → 100.4 | 0.08 → 0.13 | 0.919 → **0.308** | 0.50 → 0.48 |
+| stream | 663.6 → **49.4** | 0.47 → **0.11** | 0.996 → **0.414** | 0.17 → — |
+| storm | 1098.4 → **214.4** | 0.77 → **0.25** | 0.976 → **0.323** | — → — |
+| meadow | 309.2 → **118.0** | 0.27 → **0.15** | 0.993 → **0.467** | 1.19 → 1.22 |
+| thunder | 451.8 → 642.4 | 0.88 → 0.90 | 1.000 → 1.000 | 0.24 → 0.22 |
+| explosion | 383.2 → 398.8 | 0.75 → 0.78 | 0.998 → 0.940 | 0.86 → **0.44** |
+| impact | 88.4 → 88.4 | 0.35 → 0.35 | 0.999 → 0.999 | — → — |
+| sword | 151.1 → **60.4** | 0.60 → **0.24** | 0.966 → 0.966 | 1.44 → — |
+| birdsong | 511.7 → 540.1 | 0.53 → 0.65 | 0.977 → 0.950 | 3.46 → **2.69** |
+
+Reading the table:
+
+- **Beds** (rain, wind, fire, stream, storm, meadow): every one now
+  reads interaural ≤ 0.47 above 500 Hz (was 0.92–1.00 — the decorrelate
+  pass), and the periodic gain line is gone (line share 0.11–0.25; the
+  storm preset's sinusoid swell — an exact 0.05 Hz spectral line —
+  dropped peak/mean 1098 → 214 after the preset migrated to a shared
+  tilted latent field). Fire's peak/mean rise is its Cox-driven crackle
+  clustering, not a line: its line share stays 0.13.
+- **One-shots** (thunder, explosion, impact, sword, birdsong): the
+  gain-modulation spectrum is dominated by each event's own decay
+  envelope, so a high line share is the event shape, not a periodic
+  LFO — none of these carry a repeating gain line (their modulation
+  peaks sit at the event's own timescale). Sword's peak/mean and line
+  share both dropped sharply after the Karplus-Strong pair became a
+  modal metal bank. Thunder and explosion keep interaural ≈ 1.0 by
+  design: a distant clap is a single far-field source, not a decorrelated
+  bed. Birdsong's phrase field is a Cox process on a tilted latent
+  (interval CV 3.46 → 2.69), and every motif repetition re-renders with
+  micro-jitter (repetition correlation < 0.9995, unit-tested).
+- **Acceptance** (`DESIGN-REALISM-ENGINE.md` §7/§8): no exactly-periodic
+  gain line on any migrated bed; interaural < 0.9 above 500 Hz on every
+  bed — both hold with wide margins.

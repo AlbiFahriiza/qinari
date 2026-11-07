@@ -70,6 +70,17 @@ RTF 0.37 (M1) and 0.39 (F1). All are under the < 1.0 goal — speech
 renders at least 2.3× faster than it plays. (The 0.0.5 Piper-era
 numbers — RTF 0.05/0.31 — belong to the deleted VITS engine.)
 
+## TTS intelligibility (ASR, 0.1.5)
+
+The fixed 30-sentence corpus (15 id + 15 en) rendered with
+`supertonic-M1` and transcribed by faster-whisper `whisper-small`
+(CPU int8, language forced): word accuracy **0.9610** overall
+(id 0.9490, en 0.9720) against the ≥ 0.95 acceptance gate — **pass**.
+Four of the eight errors are digit-vs-word transcription artifacts
+(the model speaks `fifty thousand`, whisper writes `50,000`), so the
+effective intelligibility is higher. Full transcript, method, and
+per-sentence table: **[ASR-TRANSCRIPT-0.1.5.md](ASR-TRANSCRIPT-0.1.5.md)**.
+
 ## Mastering accuracy
 
 `qinari sfx rain -d 10s --seed 1` (default chain, target −16 LUFS,

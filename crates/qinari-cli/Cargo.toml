@@ -15,12 +15,12 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
-qinari-audio = { version = "0.0.5-alpha", path = "../qinari-audio" }
-qinari-sfx = { version = "0.0.5-alpha", path = "../qinari-sfx" }
-qinari-music = { version = "0.0.5-alpha", path = "../qinari-music" }
-qinari-tts = { version = "0.0.5-alpha", path = "../qinari-tts" }
-qinari-verify = { version = "0.0.5-alpha", path = "../qinari-verify" }
+qinari-dsp = { version = "0.1.5", path = "../qinari-dsp" }
+qinari-audio = { version = "0.1.5", path = "../qinari-audio" }
+qinari-sfx = { version = "0.1.5", path = "../qinari-sfx" }
+qinari-music = { version = "0.1.5", path = "../qinari-music" }
+qinari-tts = { version = "0.1.5", path = "../qinari-tts" }
+qinari-verify = { version = "0.1.5", path = "../qinari-verify" }
 thiserror = { workspace = true }
 strsim = { workspace = true }
 sha2 = { workspace = true }

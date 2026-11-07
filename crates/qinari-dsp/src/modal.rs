@@ -252,7 +252,7 @@ mod tests {
         for material in Material::ALL {
             let bank = ModalBank::material(material, &mut rng());
             let excitation: Vec<f32> = (0..96)
-                .map(|i| if i % 2 == 0 { 0.5 } else { -0.5 })
+                .map(|i: usize| if i.is_multiple_of(2) { 0.5 } else { -0.5 })
                 .collect();
             let strike = bank.strike(44_100.0, &excitation, 0.3);
             assert!(strike.iter().all(|s| s.is_finite()), "{material:?}");

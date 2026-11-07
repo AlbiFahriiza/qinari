@@ -138,7 +138,7 @@ fn version_and_help_work() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("qinari 0.0.5-alpha"));
+        .stdout(predicate::str::contains("qinari 0.1.5"));
     sandbox
         .qinari()
         .arg("--help")
@@ -480,7 +480,7 @@ fn info_json_reports_the_whole_state() {
     let sandbox = Sandbox::new("info-json");
     let output = sandbox.ok(&["info", "--json"]);
     let text = stdout(&output);
-    assert!(text.contains("\"version\":\"0.0.5-alpha\""), "{text}");
+    assert!(text.contains("\"version\":\"0.1.5\""), "{text}");
     assert!(text.contains("\"paths\""));
     assert!(text.contains("\"engine\":\"auto\""));
     assert!(text.contains("\"supertonic-M1\""));
@@ -1006,4 +1006,72 @@ fn interactive_leaves_cleanly_off_a_terminal() {
         .assert()
         .success()
         .code(0);
+}
+
+#[test]
+#[ignore = "golden gate: needs the installed Supertonic voice and DNSMOS models"]
+fn golden_tts_gates_hold() {
+    // The golden paragraph and seed of the 0.1.5 gate tier
+    // (DESIGN-TTS-EXPRESSIVE.md: DNSMOS OVRL >= 3.35, F0 sigma >= 3.5 st,
+    // >= 2 pauses, duration floor +/- 5%). Every threshold below was
+    // measured on this exact render: 17.43 s, F0 sigma 4.1 st, 2 pauses,
+    // DNSMOS OVRL 3.48. Byte determinism is same-machine (the qinari-tts
+    // live suite pins it); the duration tolerance is the cross-machine
+    // belt-and-braces.
+    let paragraph = "Selamat datang di Qinari, mesin suara prosedural. \
+[pause:400] Hari ini kita uji ekspresi dan prosodi natural: jeda, napas, \
+dan intonasi yang hidup. [pause:600] Angka juga diuji: tiga puluh empat, \
+dan tujuh ratus ribu rupiah. Sampai jumpa di sesi berikutnya.";
+    let out = std::env::temp_dir().join(format!("qinari-golden-{}.wav", std::process::id()));
+    let render = Command::cargo_bin("qinari")
+        .expect("qinari binary is built")
+        .env_remove("QINARI_TTS_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .args([
+            "tts",
+            "--lang",
+            "id",
+            "--seed",
+            "golden-0.1.5",
+            "-o",
+            out.to_str().unwrap(),
+            "--json",
+            paragraph,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let report: serde_json::Value = serde_json::from_str(&stdout(&render)).expect("tts --json");
+    let duration = report["duration_s"].as_f64().expect("duration_s");
+    assert!(
+        (duration - 17.43).abs() / 17.43 <= 0.05,
+        "golden duration {duration} s drifted past ±5% of 17.43 s"
+    );
+    let measured = Command::cargo_bin("qinari")
+        .expect("qinari binary is built")
+        .args([
+            "analyze",
+            out.to_str().unwrap(),
+            "--mos",
+            "--speech",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let analysis: serde_json::Value =
+        serde_json::from_str(&stdout(&measured)).expect("analyze --json");
+    let ovrl = analysis["dnsmos"]["ovrl"].as_f64().expect("ovrl");
+    assert!(ovrl >= 3.35, "DNSMOS OVRL {ovrl} is below the 3.35 gate");
+    let sigma = analysis["speech"]["f0_sigma_st"]
+        .as_f64()
+        .expect("f0_sigma_st");
+    assert!(sigma >= 3.5, "F0 sigma {sigma} st is below the 3.5 st gate");
+    let pauses = analysis["speech"]["pause_count"]
+        .as_u64()
+        .expect("pause_count");
+    assert!(pauses >= 2, "{pauses} pauses is below the 2-pause gate");
+    let _ = std::fs::remove_file(&out);
 }

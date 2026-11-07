@@ -127,7 +127,7 @@ impl LoudnessMeter {
     /// A short frame contributes silence on the missing channels; extra
     /// entries are ignored.
     pub fn process(&mut self, frame: &[f32]) {
-        if self.position % self.step_samples as u64 == 0 {
+        if self.position.is_multiple_of(self.step_samples as u64) {
             self.active.push_back(BlockAccumulator::default());
         }
         let mut sum_sq = 0.0f64;

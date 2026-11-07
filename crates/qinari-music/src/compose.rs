@@ -352,7 +352,7 @@ fn thin(notes: &[MotifNote]) -> Vec<MotifNote> {
     notes
         .iter()
         .enumerate()
-        .filter(|(index, _)| index % 2 == 0)
+        .filter(|(index, _)| index.is_multiple_of(2))
         .map(|(_, note)| MotifNote {
             beat: note.beat,
             len: note.len * 1.75,
@@ -1406,7 +1406,7 @@ impl Composer<'_> {
             );
             for step in 0..8usize {
                 let beat = base + self.swing(step as f32 * 0.5);
-                let accent = if step % 2 == 0 { 0.1 } else { 0.065 };
+                let accent = if step.is_multiple_of(2) { 0.1 } else { 0.065 };
                 bus.add(
                     self.at(beat),
                     &hat(self.sr, &mut self.drums_rng, false),
@@ -1539,10 +1539,10 @@ impl Composer<'_> {
                 0.3,
                 0.08,
             );
-            let divisions = if verse_index >= 1 { 16 } else { 8 };
+            let divisions = if verse_index >= 1 { 16u32 } else { 8 };
             for step in 0..divisions {
                 let beat = base + step as f32 * (BEATS_PER_BAR / divisions as f32);
-                let pan_pos = if step % 2 == 0 { -0.3 } else { 0.3 };
+                let pan_pos = if step.is_multiple_of(2) { -0.3 } else { 0.3 };
                 bus.add(
                     self.at(beat),
                     &chip_hat(self.sr, &mut self.drums_rng),
@@ -1666,7 +1666,7 @@ impl Composer<'_> {
                     self.sr,
                     &mut self.arp_rng,
                 );
-                let pan_pos = if step % 2 == 0 { -0.45 } else { 0.45 };
+                let pan_pos = if step.is_multiple_of(2) { -0.45 } else { 0.45 };
                 bus.add(self.at(beat), &note, 0.14, pan_pos);
             }
         }

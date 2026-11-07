@@ -1314,7 +1314,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-audio"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "criterion",
  "hound",
@@ -1327,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-cli"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1354,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-dsp"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "criterion",
  "thiserror",
@@ -1362,7 +1362,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-music"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "criterion",
  "qinari-dsp",
@@ -1371,7 +1371,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-sfx"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "criterion",
  "qinari-dsp",
@@ -1381,7 +1381,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-tts"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "hound",
  "ort",
@@ -1396,7 +1396,7 @@ dependencies = [
 
 [[package]]
 name = "qinari-verify"
-version = "0.0.5-alpha"
+version = "0.1.5"
 dependencies = [
  "ort",
  "qinari-audio",

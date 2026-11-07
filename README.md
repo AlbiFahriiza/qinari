@@ -26,10 +26,12 @@ $ qinari music synthwave -d 60s --seed nightdrive -o drive.mp3
 - **5 composed music styles** (lofi, ambient, synthwave, cinematic,
   chiptune) with chords, motif development, drums, and section layout —
   composed per seed, not looped samples.
-- **Offline neural TTS** for Indonesian and English (Piper-class VITS
-  voices, ONNX Runtime, no network needed after setup) plus an
-  OpenAI-compatible cloud engine — same command, `--engine auto` picks
-  local when the voice is installed.
+- **Offline neural TTS** for Indonesian and English (Supertonic 3, ten
+  voices, ONNX Runtime, no network needed after setup) with expression
+  markup (`[laugh]` `[breath]` `[sigh]` `[pause:400]`), seeded
+  determinism, and two cloud engines (any OpenAI-compatible endpoint,
+  ElevenLabs) — same command, `--engine auto` picks local when the
+  voice is installed.
 - **House mastering**: every render lands on a loudness target
   (−16 LUFS default, configurable) with a lookahead limiter; `qinari
   master` re-masters existing files, `qinari analyze` measures them.
@@ -54,25 +56,26 @@ curl -fsSL -o Installer.sh https://raw.githubusercontent.com/AlbiFahriiza/qinari
 less Installer.sh && bash Installer.sh          # --prefix, --tag, --build, --dev, --uninstall
 ```
 
-From source (Rust 1.85+, `curl` on PATH for voice setup):
+From source (Rust 1.92+, `curl` on PATH for voice setup):
 
 ```
 git clone https://github.com/AlbiFahriiza/qinari && cd qinari
 cargo build --release --bin qinari
-./target/release/qinari setup --yes --accept-license   # installs voices (~200 MB)
+./target/release/qinari setup --yes --accept-license   # installs voices (~400 MB)
 ```
 
 ## Quick tour
 
 ```
 qinari sfx --list                    # all 30 recipes
-qinari sfx ui_success -d 500ms --seed chime
+qinari sfx impact --set material=1 --seed anvil   # modal materials: wood/metal/ceramic/thud
 qinari ambient storm -d 10m --seed night -o storm.wav
 qinari music lofi --bpm 82 -d 45s --seed café
 qinari tts "Tiga puluh empat" --lang id --speed 1.2 -o angka.wav
-cat story.txt | qinari tts - --lang en -o story.mp3
+qinari tts --lang id --seed storm --style F1 "Bab satu. [pause:400]Badai dimulai." -o bab1.wav
+qinari analyze angka.wav --speech --mos    # F0 stats, pauses, DNSMOS
 qinari master old-mix.wav --target-lufs -14 --character warm
-qinari analyze storm.wav
+qinari interactive                     # prompted renders in a loop
 qinari doctor                        # exit 8 = not healthy (scriptable)
 ```
 
@@ -89,8 +92,8 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 | heaviest 10 s sound effect | 43 ms | 231× |
 | 60 s ambient bed | 0.69 s | 87× |
 | 30 s music track | 0.27 s | 110× |
-| Indonesian TTS | — | RTF 0.05 |
-| English TTS | — | RTF 0.31 |
+| Indonesian TTS (17 s narration) | RTF 0.44 | 2.3× |
+| English TTS (17 s narration) | RTF 0.29 | 3.4× |
 | 30 s `rain`, end-to-end vs a NumPy/SciPy port | 0.29 s vs 1.81 s | 6.2× faster |
 | mastered output peak | at the ceiling (−1.0 dBFS default), enforced on transients | brickwall |
 
@@ -99,13 +102,14 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 - **[docs/AUDIO-PIPELINE.md](docs/AUDIO-PIPELINE.md)** — from generator
   to mastered file: resampling, the −16 LUFS chain, noise-shaped
   dither, atomic `.wav`/`.mp3` encoding.
-- **[docs/TTS.md](docs/TTS.md)** — voices, licenses, offline VITS
-  inference, cloud engine, text normalization for `id`/`en`.
+- **[docs/TTS.md](docs/TTS.md)** — voices, licenses, the Supertonic
+  engine, expression markup, cloud engines, text normalization for
+  `id`/`en`, DNSMOS measurement.
 - **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** — every number above
-  with its measurement.
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the six-crate
-  workspace (`qinari-dsp`/`-audio`/`-sfx`/`-music`/`-tts`/`-cli`) and
-  dependency direction.
+  with its measurement, plus the realism before/after tables.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the seven-crate
+  workspace (`qinari-dsp`/`-audio`/`-sfx`/`-music`/`-tts`/`-verify`/`-cli`)
+  and dependency direction.
 - **[docs/RESEARCH-AUDIO-REALISM.md](docs/RESEARCH-AUDIO-REALISM.md)** —
   verified research groundwork for the 0.1.0 realism engine: texture
   statistics, physical modeling, the proven TTS PAD bug, voice ceilings,
@@ -118,18 +122,19 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 
 ## Non-Rust dependencies
 
-`curl` (runtime, for downloads), eSpeak NG phoneme data (bundled via
-crates), ONNX Runtime (built with the TTS crate), LAME (mp3 encode).
+`curl` (runtime, for downloads), ONNX Runtime (built with the TTS
+crate), LAME (mp3 encode). Model weights are downloaded by `setup`,
+hash-pinned: Supertonic 3 (OpenRAIL-M) and DNSMOS (CC BY 4.0).
 Full list with roles: **[docs/NON-RUST-DEPENDENCIES.md](docs/NON-RUST-DEPENDENCIES.md)**.
 
 ## Project status
 
-v0.0.5-alpha. Linux first; other platforms compile but are untested.
+v0.1.5. Linux first; other platforms compile but are untested.
 See **[docs/GOALS.md](docs/GOALS.md)** for the goal table and its
 evidence, [SPEC.md](docs/SPEC.md) for scope, and
 [CONTRIBUTING.md](CONTRIBUTING.md) / [SECURITY.md](SECURITY.md) for
 how to help.
 
 License: GPL-3.0-or-later (code). Model weights keep their own
-licenses — the Indonesian voice is non-commercial and asks for
-explicit acceptance during setup; the English voice is CC BY 4.0.
+licenses — the Supertonic voices are OpenRAIL-M and ask for explicit
+acceptance during setup; the DNSMOS models are CC BY 4.0.

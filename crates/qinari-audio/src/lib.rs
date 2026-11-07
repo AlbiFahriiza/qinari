@@ -77,7 +77,7 @@ pub(crate) fn deinterleave(
     channels: usize,
     sample_rate: u32,
 ) -> Result<qinari_dsp::buffer::AudioBuffer, AudioError> {
-    if channels == 0 || samples.len() % channels != 0 {
+    if channels == 0 || !samples.len().is_multiple_of(channels) {
         return Err(AudioError::Decode(format!(
             "sample count {} is not a whole number of {}-channel frames",
             samples.len(),

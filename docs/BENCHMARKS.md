@@ -62,16 +62,13 @@ machine-readable numbers.
 
 ## TTS realtime factors
 
-Measured by `qinari setup` validation on the reference machine (full
-synthesis of a real sentence through the ONNX engine, 22.05 kHz):
-
-| Voice | Audio | Render | RTF |
-| --- | --- | --- | --- |
-| en_US-libritts-high | 1.58 s | 0.50 s | **0.31** |
-| id_ID-news_tts-medium | 1.66 s | 0.08 s | **0.05** |
-
-Both are far under the 0.4 goal — speech renders at least 3× faster
-than it plays.
+0.1.5 (Supertonic 3, measured on the 2-vCPU reference box with the
+release binary): a 17.43 s Indonesian narration renders at RTF **0.44**
+(`qinari tts --lang id --seed golden-0.1.5 --json`), a 16.73 s English
+narration at RTF **0.29**; `qinari setup` validation syntheses read
+RTF 0.37 (M1) and 0.39 (F1). All are under the < 1.0 goal — speech
+renders at least 2.3× faster than it plays. (The 0.0.5 Piper-era
+numbers — RTF 0.05/0.31 — belong to the deleted VITS engine.)
 
 ## Mastering accuracy
 

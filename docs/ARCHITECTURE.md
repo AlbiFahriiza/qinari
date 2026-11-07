@@ -1,26 +1,27 @@
-# Qinari architecture — v0.0.5-alpha
+# Qinari architecture — v0.1.5
 
 ## Workspace
 
 ```
 qinari/
 ├── crates/
-│   ├── qinari-dsp/     # synthesis, filters, effects, analysis primitives
+│   ├── qinari-dsp/     # synthesis, filters, effects, analysis primitives, latent fields, modal bank
 │   ├── qinari-audio/   # containers (wav/mp3), resampling, mastering
 │   ├── qinari-sfx/     # 30 procedural recipes + ambient presets
 │   ├── qinari-music/   # algorithmic composer, 5 styles
-│   ├── qinari-tts/     # local ONNX VITS + OpenAI-compatible cloud
+│   ├── qinari-tts/     # local Supertonic 3 engine + cloud engines (OpenAI-compatible, ElevenLabs)
+│   ├── qinari-verify/  # measurement: feature reports, distances, speech stats, DNSMOS
 │   └── qinari-cli/     # the `qinari` binary: setup, doctor, commands
-├── docs/               # this file, SPEC, RESEARCH-TTS, GOALS, …
+├── docs/               # this file, SPEC, RESEARCH-*, DESIGN-*, GOALS, …
 ├── benchmarks/         # numpy reference for the Python comparison
 ├── Installer.sh        # verified user-prefix installer
-└── .github/workflows/  # CI (check/test/tts-live/deny/build) + release
+└── .github/workflows/  # CI (msrv/check/test/tts-live/deny/build) + release
 ```
 
 Dependency direction (one-way, no cycles):
 
 ```
-dsp  <-  audio  <-  sfx / music / tts  <-  cli
+dsp  <-  audio  <-  sfx / music / tts / verify  <-  cli
 ```
 
 Only `qinari-cli` touches the network (via curl), the filesystem layout
@@ -97,8 +98,8 @@ file at `~/.local/state/qinari/qinari.log`). Exit codes:
 
 | # | Decision | Alternatives | Rationale |
 |---|----------|--------------|-----------|
-| D1 | 6-crate workspace, one-way deps | monolith | engines stay testable and replaceable; cli owns all I/O |
-| D2 | local TTS via `ort` + pure-Rust espeak | sherpa-onnx (C++ stack), piper-rs (cmake) | no C toolchain beyond `cc`; pure-Rust phonemization verified |
+| D1 | 7-crate workspace, one-way deps | monolith | engines stay testable and replaceable; cli owns all I/O |
+| D2 | local TTS via `ort` over a full Rust port of Supertonic 3 (unicode-indexer tokenizer, no phoneme data crates) | sherpa-onnx (C++ stack), piper-rs (cmake/espeak), Python SDK subprocess | no C toolchain beyond `cc`; parity-verified against the reference SDK (waveform correlation 1.0000) |
 | D3 | procedural recipes, not samples | sample packs | the differentiator: non-generic, deterministic, tiny |
 | D4 | `ureq` (rustls) for cloud HTTP | reqwest (tokio-based) | CLI needs blocking, small dependency tree; no async runtime; runtime TLS is rustls (no OpenSSL linkage in the final binary — build-time OpenSSL appears only in ort-sys's download step, see NON-RUST-DEPENDENCIES.md) |
 | D5 | LAME for MP3 | pure-Rust encoders | no mature pure-Rust MP3 encoder as of 2026-11 |

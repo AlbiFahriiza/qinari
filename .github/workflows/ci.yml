@@ -11,6 +11,16 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  msrv:
+    name: Build on the declared MSRV (1.92)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check on the exact MSRV
+        run: cargo check --workspace --all-targets
+
   check:
     name: Format and clippy
     runs-on: ubuntu-latest
@@ -46,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/qinari/models
-          key: qinari-voices-${{ runner.os }}-v2
+          key: qinari-voices-${{ runner.os }}-v3
       - name: Build the CLI
         run: cargo build --release --bin qinari
       - name: Install voices (curl download, SHA-256 verified)

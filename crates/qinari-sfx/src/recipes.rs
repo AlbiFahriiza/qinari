@@ -2195,7 +2195,7 @@ fn render_footsteps(ctx: &RenderContext) -> Result<AudioBuffer, String> {
         // damped object, jittered per step (van den Doel & Pai).
         let thud = material_strike(&mut rng, sr, Material::Thud, 0.16);
         let level = 0.3 + 0.2 * rng.next_f32();
-        let pos = if step % 2 == 0 {
+        let pos = if step.is_multiple_of(2) {
             -0.4 + rng.next_f32() * 0.15
         } else {
             0.4 - rng.next_f32() * 0.15

@@ -737,7 +737,7 @@ fn decode_wav_bytes(bytes: &[u8]) -> Result<AudioBuffer, TtsError> {
             )))
         }
     };
-    if samples.len() % channels != 0 {
+    if !samples.len().is_multiple_of(channels) {
         return Err(invalid(
             "WAV sample data is not a whole number of frames".to_string(),
         ));

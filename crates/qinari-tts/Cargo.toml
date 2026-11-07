@@ -11,8 +11,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-qinari-dsp = { version = "0.0.5-alpha", path = "../qinari-dsp" }
-qinari-audio = { version = "0.0.5-alpha", path = "../qinari-audio" }
+qinari-dsp = { version = "0.1.5", path = "../qinari-dsp" }
+qinari-audio = { version = "0.1.5", path = "../qinari-audio" }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

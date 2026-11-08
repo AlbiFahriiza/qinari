@@ -117,8 +117,8 @@ commands in **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)**):
 - **[docs/DESIGN-REALISM-ENGINE.md](docs/DESIGN-REALISM-ENGINE.md)** —
   the staged architecture built on that research: TTS sequencer fix,
   latent-modulation DSP, physics-shaped families, verification crate,
-  data-driven scenes, authoring-time refinement (0.1.0/0.2.0 roadmap
-  with acceptance criteria).
+  data-driven scenes (RFC 0.2.x), authoring-time refinement (RFC 0.3.x);
+  the staged roadmap carries the acceptance criteria.
 
 ## Non-Rust dependencies
 

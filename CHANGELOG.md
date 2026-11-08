@@ -4,6 +4,39 @@ All notable changes to Qinari are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 follow semantic versioning.
 
+## [0.2.0] — Unreleased
+
+In development (Fase A–C of `docs/PLAN-0.2.0.md`). This entry records
+the claim corrections from the 0.1.5 forensic audit (findings F9, F18,
+F20). It corrects what the 0.1.5 entry below says; where the underlying
+DSP is unchanged, this is stated, not hidden.
+
+### Fixed
+
+- **Corrected the 0.1.5 "full LFO migration" claim.** The 0.1.5 entry
+  below says "every bed recipe and every ambient preset migrated off
+  periodic LFOs". That was wrong for ocean: `render_ocean` still drives
+  its swell with a periodic `fast_sine(0.055 * t)` sinusoid. Three more
+  periodic AM lines also survive the 0.1.5 migration: the engine
+  flutter (4.3 Hz), the forcefield throb (0.37 Hz), and the siren alarm
+  sweep. The documentation now matches the code; the ocean DSP fix is
+  scheduled for 0.3.0 (plan P3-4) and the remaining AM lines stay open
+  as finding F20 — none of them is claimed fixed in 0.2.0.
+- **Header comment corrections in `qinari-sfx`** (comments only, no
+  behavior change): the crate header said 29 recipes — the registry
+  holds 30 (`birdsong` was added post-alpha without updating the
+  header); the ambient docs said event layers fire at Poisson times —
+  the implementation is a Cox (doubly stochastic) process whose rate
+  rides the shared latent field.
+- **`qinari-graph` and `qinari refine` are RFC, not features.**
+  `DESIGN-REALISM-ENGINE.md` presented them as 0.2.0 stages; neither
+  exists — no crate in the workspace manifest, no subcommand in the
+  CLI. The design doc now marks them RFC with target versions 0.2.x
+  (graph, plan P2-1) and 0.3.x (refine, plan P4-1), and the 0.1.5-era
+  optimizer sketch is superseded by the plan's in-house deterministic
+  optimizer (P4-1, decision D7). `docs/GOALS.md` is rewritten for the
+  0.2.0 gate table so no document claims a feature that is absent.
+
 ## [0.1.5] — 2026-11-07
 
 One release collapsing the staged 0.1.0/0.2.0 roadmap of

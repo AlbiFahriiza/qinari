@@ -2,11 +2,11 @@
 //!
 //! Each [`AmbientPreset`] layers 2-4 recipes. Bed layers (events per
 //! minute = 0) render for the whole requested duration and ride a slow
-//! gain swell; event layers fire short one-shot recipes at Poisson times
-//! instead, each instance seeded independently, so a storm rolls thunder
-//! through a long render. Like recipes, every random decision flows from
-//! the caller's seed through text tags: the same request renders
-//! bit-identical audio.
+//! gain swell; event layers fire short one-shot recipes at Cox-process
+//! times instead (the rate rides the shared latent field), each instance
+//! seeded independently, so a storm rolls thunder through a long render.
+//! Like recipes, every random decision flows from the caller's seed
+//! through text tags: the same request renders bit-identical audio.
 
 use qinari_dsp::buffer::AudioBuffer;
 use qinari_dsp::events::cox_events;
@@ -260,8 +260,9 @@ pub fn find_preset(id: &str) -> Option<&'static AmbientPreset> {
 /// Validation order: preset id, duration (1..=3600 s inclusive), sample
 /// rate, channels (1 or 2). Bed layers render once for the whole duration
 /// and ride the layer's slow gain motion; event layers fire the recipe as
-/// one-shots at Poisson times inside a six-second window. The result is
-/// exactly `ch` channels and `secs`-worth of frames.
+/// one-shots at Cox-process times (rate driven by the shared field) inside
+/// a six-second window. The result is exactly `ch` channels and
+/// `secs`-worth of frames.
 ///
 /// # Errors
 ///

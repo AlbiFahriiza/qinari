@@ -51,14 +51,15 @@ realism engine:
 
 ## 3. Architecture overview
 
-Target crate graph (0.2.0 end-state; staged in §11) — layers list their
+Target crate graph (end-state; staged in §11 — `qinari-graph` and
+`refine` are RFC, not in the workspace; §9/§10) — layers list their
 true dependencies:
 
 ```
 qinari-dsp      primitives (osc, filters, noise, env, fx, rng, lufs, …)
                 → depends on: nothing but std/thiserror
 
-qinari-graph    NEW: scene graph — events → layers → tracks (buses),
+qinari-graph    RFC 0.2.x — no such crate yet (§9): scene graph — events → layers → tracks (buses),
                 declarative variation (playlists, scatterers),
                 TOML recipe schema, statistical target blocks
                 → depends on: dsp
@@ -74,7 +75,8 @@ qinari-tts      VITS engine (PAD fix, text normalization, per-sentence)
                                                     → depends on: dsp
 qinari-audio    resample → master → dither → encode (unchanged path)
                                                     → depends on: dsp
-qinari-cli      surface: existing + `analyze` + `verify` + `refine`
+qinari-cli      surface: existing (`analyze` shipped) + `verify`
+                (planned 0.2.0, P0-4) + `refine` (RFC 0.3.x, §10)
                                                     → depends on: all above
 ```
 
@@ -86,7 +88,8 @@ author (TOML recipe + target statistics or reference file)
    → render (pure, seeded, fast)
    → analyze (features: spectrum, band envelopes, modulation, event rate)
    → distance vs target
-   → refine (Nelder-Mead ≤10 params / CMA-ES 10–40 params, seeded)
+   → refine (RFC 0.3.x, §10 — seeded; in-house deterministic optimizer
+     per plan P4-1/D7, not the Nelder-Mead/CMA-ES sketch)
    → write params back into the recipe   → shipped renders stay pure
 ```
 
@@ -291,7 +294,13 @@ monotonically lowers HF corner. Thunder: ≥4 detected onsets spread
 (enforced in test); motif repetitions differ (auto-correlation of
 phrase audio < 1 within tolerance).
 
-## 9. Stage GRAPH-1 — scenes as data (0.2.0)
+## 9. Stage GRAPH-1 — scenes as data (RFC — target 0.2.x)
+
+> Status: RFC, not a feature. No `qinari-graph` crate exists in the
+> workspace manifest and no scene-TOML flag exists on the CLI. It was
+> rescheduled from 0.2.0 to 0.2.x as task P2-1 by
+> `docs/PLAN-0.2.0.md` §7.8 (decision D5); the sketch below is the
+> design direction, not a shipping claim.
 
 New crate `qinari-graph`; `qinari-sfx` recipes migrate from `static
 RECIPES: [Recipe; N]` fn tables (`recipes.rs:1901`) to TOML documents
@@ -343,7 +352,16 @@ event_cv = { min = 0.4, max = 1.6 }
 - CLI: `--recipe-file path.toml` additive flag; built-ins resolve from
   an embedded include of the same TOML (one source of truth).
 
-## 10. Stage REFINE-1 — authoring-time optimization (0.2.0)
+## 10. Stage REFINE-1 — authoring-time optimization (RFC — target 0.3.x)
+
+> Status: RFC, not a feature. No `refine` subcommand exists on the CLI
+> (13 subcommands as of 0.1.5 — `verify` and `refine` are not among
+> them). It was rescheduled from 0.2.0 to 0.3.x as task P4-1 by
+> `docs/PLAN-0.2.0.md` §7.8. Per plan P4-1/D7 the first phase is an
+> in-house deterministic coordinate descent with no new dependency;
+> the `argmin`/`cmaes` sketch below is superseded, and no external
+> optimizer may be added without registry verification and owner
+> approval.
 
 `qinari refine sfx <recipe> --target <ref.wav|target.toml> --params
 a,b,c --seed x --budget 300`:
@@ -412,11 +430,12 @@ criteria: the failing sentence renders at natural pace; every migrated
 recipe has committed golden targets and a before/after statistics table;
 MSRV job green on 1.87; all existing gates green.
 
-**0.2.0 — "Composed and Tuned"**: GRAPH-1 (§9), REFINE-1 (§10), modal
-bank + birdsong v2 (§8), full recipe migration. Exit criteria: all
-built-in recipes are TOML; `qinari refine` demonstrably closes ≥50% of
-the texture-stat distance to a reference for one bed recipe (target
-measured before/after in the release notes).
+**0.2.0 — rescheduled by `docs/PLAN-0.2.0.md`**: GRAPH-1 (§9) moved to
+0.2.x (P2-1) and REFINE-1 (§10) to 0.3.x (P4-1); both are RFC, not
+0.2.0 deliverables. The modal bank and birdsong v2 of §8 shipped with
+0.1.5. The binding 0.2.0 scope and exit criteria are the plan's
+§7.5–§7.7 and §11 Go/No-Go — not this paragraph; full recipe migration
+to TOML follows the graph crate and is 0.2.x work.
 
 Risks and mitigations: metric overfitting (multi-feature + ears, §10);
 optimizer non-determinism (seeded + recorded, §10); recipe migration

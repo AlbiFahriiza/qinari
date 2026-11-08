@@ -1,6 +1,6 @@
 //! Qinari sfx crate: procedural sound effects and ambient beds.
 //!
-//! [`recipes`] holds the 29 deterministic sound-effect recipes (rain,
+//! [`recipes`] holds the 30 deterministic sound-effect recipes (rain,
 //! thunder, laser, ui clicks, ...), [`ambient`] layers them into five
 //! long beds with slow gain motion, and [`params`] validates the
 //! `NAME=VALUE` pairs each recipe accepts. The entry points are

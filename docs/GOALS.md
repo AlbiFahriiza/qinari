@@ -1,32 +1,113 @@
-# Qinari Goals — v0.0.5-alpha acceptance criteria
+# Qinari Goals — v0.2.0 release gates
 
-These are the release gates for v0.0.5-alpha. The release does not ship
-until every goal is PASS with recorded evidence. "Reference machine" is
-the 2-vCPU x86-64 CPU-only Linux box the numbers were produced on — see
-docs/BENCHMARKS.md for the environment and the actual measurements.
+These are the release gates for v0.2.0 (Physical Source & DSP Core). The
+release does not ship until every gate is verified with committed
+evidence — a CI log, a benchmark file, a test report, or an audit
+output, never a statement. The parent document is
+`docs/PLAN-0.2.0.md` (v2): this file tracks the same gates as the
+plan's §7.4 (phase gates), §8 (recalibrated criteria), and §11 (Go/No-Go
+checklist); where they disagree, the plan wins.
 
-| # | Goal | Threshold | Status | Evidence |
-|---|------|-----------|--------|----------|
-| G1 | Clean build | `cargo build --release` with zero warnings; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --check` clean | PASS | Release build finishes with 0 warnings; clippy `-D warnings` and `fmt --check` clean on the final tree (verified on the reference machine and in CI, job `check`) |
-| G2 | Test suite | >= 150 tests passing, 0 failing (network-marked `#[ignore]` tests excluded from the count) | PASS | `cargo test --workspace`: **298 passed, 0 failed, 4 ignored** (297 at the v0.0.5-alpha tag; +1 `birdsong_activity_changes_the_field_energy` added post-alpha with the `birdsong` recipe); the 4 ignored are live-TTS tests that need installed voices and also pass: `cargo test -p qinari-tts --release -- --ignored` → 4/4 ok, three consecutive runs |
-| G3 | SFX engine | >= 18 recipes; heaviest 10 s recipe renders in < 500 ms on the reference machine; same seed => bit-identical WAV; every recipe finite at the 8000 Hz minimum rate | PASS | 30 recipes (29 at the v0.0.5-alpha tag; `birdsong` added post-alpha with its own param tests); heaviest 10 s case (rain) **43.3 ms** in the criterion suite (11.6× under budget); determinism byte-compared in `the_same_seed_renders_byte_identical_files`; all 30 recipes render finite at 8 kHz (recipes.rs tests, LOW_SR = 8_000) |
-| G4 | Ambient engine | >= 4 presets; 60 s soundscape renders in < 3.5 s on the reference machine | PASS | 5 presets; storm 60 s renders in **693 ms** (5.1× under budget, criterion `ambient/storm_60s`) |
-| G5 | Music engine | >= 4 styles; 30 s track renders in < 3 s; sections are audibly distinct (energy variance between A/B sections asserted in tests); no NaN, peak <= 1.0 | PASS | 5 styles; heaviest 30 s style (cinematic) **272 ms** (11× under budget); section-distinctness and bound checks asserted in qinari-music tests |
-| G6 | Local TTS | Piper-class voices synthesize faster than real time: RTF <= 0.4 on the reference machine; output 22.05 kHz resampled to target rate; speed control changes duration | PASS | Setup validation on the reference machine: en **RTF 0.31**, id **RTF 0.05**; live tests `en_voice_synthesizes_faster_than_realtime`, `id_voice_synthesizes_faster_than_realtime`, `faster_speed_shortens_audio`, `local_engine_rejects_mismatched_voice_and_rate` all pass |
-| G7 | Cloud TTS | OpenAI-compatible engine passes end-to-end tests against a local mock server: auth, timeout, retry-on-5xx, malformed-response handling | PASS | Six mock-server tests in cloud.rs: bearer auth + WAV decode, 5xx-then-success retry (counts requests), persistent 503 → "HTTP 503", stalled body → timeout, non-WAV body → clean response error, chunk joining with 0.25 s pauses |
-| G8 | Audio quality | Mastering hits target LUFS within +/- 1.0 LU (997 Hz and speech-like test signals); output peak <= -0.5 dBFS after limiting; 16-bit output dithered (noise floor present, no DC bias); only .wav/.mp3 accepted (exit 6 + actionable message otherwise) | PASS | Unit tests hit −16 ±1.0 LU for all three characters and check the ceiling; measured end-to-end: rain 10 s −25.9 → **−16.0 LUFS** (deviation 0.0); the ceiling is a hard invariant — transient recipes (`ui_click`, `hit`, `impact`) deliver exactly **−1.0 dBFS** and a `--ceiling -0.5` render exactly **−0.5 dBFS** (the limiter attacks instantly on the lookahead window and clamps; two regression tests pin a full-scale impulse and a fast-attack click); dither tests assert the shaped floor ≥5× below flat at 300–1500 Hz and no DC bias; `.flac` output exits 6 with ".wav and .mp3 only" (cli tests) |
-| G9 | Setup | `qinari setup` is idempotent (second run is a no-op), resumes partial downloads, re-downloads on checksum mismatch, gates NC-licensed voices behind explicit acceptance recorded in the config, supports `--yes` non-interactive mode, and reports actionable errors when offline | PASS | Second run re-verifies the pinned SHA-256 and skips downloads; partial downloads resume via curl `--continue-at -` on the `.part` sibling; checksum-mismatched parts are removed and re-fetched (tests `bad_content_is_rejected_and_part_removed`, `downloads_verifies_and_renames_atomically`, `missing_destination_directory_is_created`); NC gate records `accepted_licenses = ["id_ID-news_tts-medium"]` in config.toml (verified on this machine); `--yes` skips prompts without accepting; a rate-limited network produced the clean `curl failed (exit 22)` message and exit 4 during this very release cycle |
-| G10 | Installer | `Installer.sh` passes `bash -n` and shellcheck, verifies SHA-256 of the downloaded artifact, installs to a user prefix without root, supports `--uninstall` and `--version` | PASS | `bash -n` silent; shellcheck 0.11.0 **zero findings**; download→`.part`→`sha256sum -c`→atomic install verified against a local server harness (good/corrupt/404/unextractable tarballs, exit 3 on all failures); `--uninstall` exit 0/5, `--version`, `--help`, usage errors exit 2 — all exercised |
-| G11 | Determinism | `qinari sfx/music` with identical seed+params produce bit-identical WAV files across runs (byte-compared in tests) | PASS | `the_same_seed_renders_byte_identical_files` byte-compares two full CLI renders; per-crate determinism tests in dsp/sfx/music |
-| G12 | Benchmarks documented | Every performance claim in README/docs traces to a measured number in BENCHMARKS.md, including a Qinari-vs-numpy comparison for a representative 30 s render | PASS | docs/BENCHMARKS.md holds every number with reproduce commands; the 30 s numpy comparison: end-to-end **292 ms vs 1811 ms (6.2× faster)**, in-process render 43.3 ms vs 84 ms (1.9×), and the maximum-favor-to-numpy framing (0.8×) is printed too |
-| G13 | Repo hygiene | No secrets in history (scanned); `cargo deny check licenses advisories` clean; CHECKPOINT_RULES followed (atomic milestone commits, pushed); docs complete and accurate (commands verified against the binary) | PASS | `cargo deny check licenses advisories bans` → **all ok** (wildcard path-dep fixed in qinari-sfx); every milestone commit pushed at checkpoint (see `git log origin/main`); token never committed (auth via remote URL only, scan in verification phase); docs commands verified against the built binary in the verification sweep |
+Status markers are honest about what exists:
 
-## Non-goals for 0.0.5
+- `open` — not verified yet; the phase that will close it is named.
+- `in verification` — work merged, evidence not yet committed.
+- `verified` — evidence committed and cited in the row.
 
-Voice cloning, singing synthesis, GPU inference, streaming playback,
-macOS and Windows binaries, Supertonic/sherpa integration (planned 0.1.0).
+A gate without recorded evidence is `open` by definition. Nothing here
+is marked by promise, and no category threshold may be quoted as a
+target before it is born from the committed golden corpus (plan §8
+reading rules, below).
+
+## Release gates (plan §11 — 9 of 9 before the `v0.2.0` tag)
+
+| # | Gate | Accepted evidence | Status |
+|---|------|--------------------|--------|
+| G1 | Correctness | T60 per mode within the plan-§8 criteria (relative error ≤ 10% on ≥ 95% of modes, measured by linear regression of the dB envelope); excitation projected onto every mode; 0 NaN/Inf; 0 uncontrolled clipping; sample-rate invariance; seed determinism proven on supported configurations | open — Fase A (P0-1, P0-6) |
+| G2 | Perceptual | every category claimed stable passes its golden gates (layers B/C) and listening Test A/B; Test C real-vs-synthetic on the hold-out measured and recorded | open — Fase B for the source work; listening tests per plan §6.4 |
+| G3 | Determinism | seed reproducibility proven at 44.1/48 kHz for the full catalog; bit-identical | open — holds on the 0.1.5 baseline (byte-compare tests); must be re-proven on the 0.2.0 catalog |
+| G4 | Performance | RTF, CPU per voice, memory, and concurrent load meet `docs/PERFORMANCE.md` (numbers locked at RC) on the reference hardware (see docs/BENCHMARKS.md) | open — Fase C (C-1); PERFORMANCE.md does not exist yet |
+| G5 | Reliability | 10k-event stress, 10-minute renders, parser fuzz, malformed input, recovery and error handling — all with regression tests | open — Fase C (C-3) |
+| G6 | Compatibility | public API, profile schema (`schema_version` + migrator), the 0.1.5 CLI surface still works, 0.1.5 → 0.2.0 migration guide published | open — Fase C (C-4) |
+| G7 | Licensing | corpus provenance complete (URL, license, access date, SHA-256, split); dependency license audit green (cargo-deny); no NC-licensed asset on the product path | open — Fase A (P0-4): acquisition done (104 CC0 files, 8 categories, provenance manifest committed); statistics extraction later in Fase A; cargo-deny re-run at RC |
+| G8 | Distribution | cross-OS CI matrix green; release binaries + verified checksums; CHANGELOG and release notes complete; `Cargo.lock` locked | open — Fase C (C-5, C-6) |
+| G9 | Release review | no open P0/P1 blockers (including the completed P0-2 re-derivation); every feature labeled stable has acceptance evidence; features not yet passing their gates stay `experimental` | open — continuous |
+
+Rule: nine of nine before the tag. Sign-off is not granted because
+"Fase A and B are done" — only because the gates above are proven
+(plan §11).
+
+## Phase exit gates (plan §7.4 — all green before the next phase starts)
+
+1. `cargo fmt --check`
+2. `cargo clippy --workspace -- -D warnings`
+3. `cargo test --workspace`, including the new render tests
+4. Layer A–B–C regression benchmarks do not worsen against the locked
+   0.1.5 baseline (P0-8) under the four-class policy of plan §9 — CI
+   classifies each change, it does not blind-block
+5. Listening Test A/B passes for every tuning change
+6. One atomic commit per task; the message names the task code
+   (P0-1, P1-3, …)
+
+## Recalibrated completion criteria (plan §8, in force)
+
+| Task | Criterion in force (v2 — supersedes the v1 numbers) |
+|------|------------------------------------------------------|
+| P0-1 modal bank | T60 relative error ≤ 10% per mode (a time quantity; the v1 "< 1 dB" was a unit error); slope per mode from linear regression of the dB envelope on the `0..t60` window with an explicit noise floor; ≥ 95% of modes conform; the envelope fit error is reported separately in dB |
+| P0-1 separation | spectral distance between materials > 3× the distance between seeds (4 materials × 6 seeds) |
+| P0-2 verifier | synthetic two-channel signals reproduce analytic C/C1/C2 within 0.02; C/C1/C2 stable across ≥ 3 corpus recordings per category (CV < 0.3); every filterbank parameter carries a primary-source citation in `docs/VERIFICATION-0.2.0.md` before implementation freezes |
+| P0-3 stereo | per-channel features detect asymmetric L/R test signals; the report keeps the old fields as aggregates (backward compatible) |
+| P0-4 corpus | golden JSON stores quantiles (median, P10, P90, mean, sd, CI) — min–max only as a supplement; 3-way split with no source leakage; ≥ 6 categories with full provenance |
+| P0-6 invariance | fractal corners stay within ±2% at 44.1/48/96 kHz; spectra within 0.5 dB over 20–10240 Hz across rates |
+
+Reading rules (plan §8):
+
+1. Every category threshold (IACC, flatness, class ratios, modulation
+   spectra) must be born from the committed golden corpus; example
+   numbers from the plan may not be copied into tests.
+2. If corpus measurement shows the 10% T60 bound is too strict for
+   noisy weak modes, the bound is revised in the plan with data — never
+   silently in a test.
+
+## What exists today (committed 0.1.5 baseline, audit-verified)
+
+Honest inventory at the start of 0.2.0 (plan §1c, verified on HEAD):
+
+- Workspace: 7 crates (dsp, audio, sfx, music, tts, verify, cli). No
+  `qinari-graph` crate — it is RFC 0.2.x (plan P2-1); no `refine`
+  subcommand — it is RFC 0.3.x (plan P4-1). Neither exists in the
+  workspace manifest or the CLI.
+- CLI: 13 subcommands; no `verify` yet. `qinari verify` is planned for
+  0.2.0 (P0-4); until it lands with deterministic CI behavior it is not
+  claimed anywhere.
+- Engine: 30 recipes, 5 ambient presets, 5 music styles; 486 `#[test]`
+  attributes on the 0.1.5 baseline; determinism byte-compared in tests.
+- Golden corpus: acquisition complete (P0-4 part 1) — 104 CC0
+  recordings over 8 categories (rain, wind, fire, stream, ocean,
+  thunder, impact, footsteps), stored outside the repository, with the
+  provenance manifest
+  `crates/qinari-verify/tests/golden/corpus-manifest.json`
+  (per-file URL, license, access date, duration, sample rate, channels,
+  SHA-256, microphone context, 3-way split by uploader with no source
+  leakage). Statistics extraction, golden statistics JSON, and the
+  `verify` subcommand land later in Fase A; no golden statistics JSON
+  exists yet.
+- Known 0.1.5 defects carried as open findings (plan §3): the ocean
+  swell is still periodic (`fast_sine(0.055·t)`, F9); three more
+  periodic AM lines survive (engine flutter, forcefield throb, siren
+  sweep — F20); C1/C2 are not implemented as defined (F13); 25 of 30
+  recipes render fully dry (F10).
+
+## Non-goals for 0.2.0 (plan §1.2)
+
+No scene graph, no ISO atmospheric propagation filters, no geometric
+room reverb, no scene occlusion, no full Doppler, not the complete set
+of natural source families, no automated parameter refinement, no
+formal ABX/MUSHRA harness. Those are 0.2.x and 0.3.x work; the release
+name is only as wide as its evidence.
 
 ## Status legend
 
-PASS with evidence / FAIL with reason. This table is updated at release
-time; a goal without recorded evidence is FAIL by definition.
+`open` / `in verification` / `verified` with cited evidence. This table
+is updated at checkpoint time; a gate without recorded evidence is
+`open` by definition.

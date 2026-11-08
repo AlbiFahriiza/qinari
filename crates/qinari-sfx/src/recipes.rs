@@ -247,23 +247,27 @@ fn add_layer(bus: &mut Bus, start: usize, samples: &[f32], gain: f32, pan_from: 
     }
 }
 
-/// Strikes a material bank with a few milliseconds of white noise and
-/// peak-normalizes the ring to 0.7, matching the shaped-noise helpers'
-/// convention so recipes scale it by design levels.
-fn material_strike(rng: &mut Qrng, sr: f32, material: Material, ring_secs: f32) -> Vec<f32> {
+/// Strikes a material bank with a few milliseconds of white-noise force.
+/// The bank projects the excitation onto every mode's damped basis, so
+/// the strike shapes the inter-mode energy; its single global gain sets
+/// the layer level while per-mode relative gains pass through untouched
+/// (plan 0.2.0 P0-1 — the 0.1.5 peak normalization to 0.7 destroyed the
+/// strike-energy information, finding F3). The strike point is drawn
+/// around the object's middle, varying per hit like Pauletto & Barahona's
+/// per-hit randomization.
+fn material_strike(
+    rng: &mut Qrng,
+    sr: f32,
+    material: Material,
+    ring_secs: f32,
+) -> Result<Vec<f32>, String> {
     let bank = ModalBank::material(material, rng);
     let excitation: Vec<f32> = (0..(0.004 * sr) as usize)
         .map(|_| rng.next_range(-1.0, 1.0))
         .collect();
-    let mut strike = bank.strike(sr, &excitation, ring_secs);
-    let peak = strike.iter().fold(0.0_f32, |top, s| top.max(s.abs()));
-    if peak > 1e-9 {
-        let scale = 0.7 / peak;
-        for sample in &mut strike {
-            *sample *= scale;
-        }
-    }
-    strike
+    let position = 0.35 + 0.3 * rng.next_f32();
+    bank.strike_at(sr, &excitation, ring_secs, position)
+        .map_err(|error| error.to_string())
 }
 
 /// Renders a sine whose pitch glides from `f0` to `f1` (exponential in
@@ -1292,7 +1296,7 @@ fn render_impact(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     // Body: the struck object rings as a modal bank (van den Doel &
     // Pai) — the pink-noise wash this replaces had no spectral fine
     // structure at all.
-    let body = material_strike(&mut tagged_rng("impact", "body", ctx), sr, material, 0.9);
+    let body = material_strike(&mut tagged_rng("impact", "body", ctx), sr, material, 0.9)?;
     add_layer(&mut bus, 0, &body, 0.35 + 0.4 * intensity, 0.0, 0.0);
 
     // A soft sigh of air after the hit.
@@ -1401,7 +1405,7 @@ fn render_sword(ctx: &RenderContext) -> Result<AudioBuffer, String> {
         sr,
         Material::Metal,
         1.4,
-    );
+    )?;
     add_layer(
         &mut bus,
         (0.16 * sr) as usize,
@@ -1445,7 +1449,7 @@ fn render_hit(ctx: &RenderContext) -> Result<AudioBuffer, String> {
 
     // Body: the struck object's modal ring (thud by default — a body
     // hit is dull; switch material for wood/metal/ceramic strikes).
-    let body = material_strike(&mut tagged_rng("hit", "body", ctx), sr, material, 0.6);
+    let body = material_strike(&mut tagged_rng("hit", "body", ctx), sr, material, 0.6)?;
     add_layer(&mut bus, 0, &body, 0.45, 0.0, 0.0);
 
     let mut out = bus.buffer();
@@ -2193,7 +2197,7 @@ fn render_footsteps(ctx: &RenderContext) -> Result<AudioBuffer, String> {
         let at = (t * sr) as usize;
         // Each footfall strikes a thud modal bank — a dull, heavily
         // damped object, jittered per step (van den Doel & Pai).
-        let thud = material_strike(&mut rng, sr, Material::Thud, 0.16);
+        let thud = material_strike(&mut rng, sr, Material::Thud, 0.16)?;
         let level = 0.3 + 0.2 * rng.next_f32();
         let pos = if step.is_multiple_of(2) {
             -0.4 + rng.next_f32() * 0.15

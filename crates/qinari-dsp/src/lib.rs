@@ -19,7 +19,7 @@
 //! stochastic process a whole render breathes on, [`events`] the renewal
 //! and Cox event processes beyond memoryless Poisson, [`spatial`] bed
 //! decorrelation / distance / early-reflection helpers, and [`modal`]
-//! modal resonator banks for struck objects.
+//! exact damped-sinusoid banks for struck objects.
 
 pub mod analysis;
 pub mod buffer;

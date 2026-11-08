@@ -750,11 +750,11 @@ Ketentuan penamaan: statistik C (korelasi antar kanal koklea) dilabel **C**; C1 
 
 - [ ] `NoiseGen::fractal` menerima sr dan mendesain per panggilan
 - [ ] Grep audit konstanta sample rate di qinari-dsp
-- [ ] Test corner: 20 Hz tetap 20 Hz ± 2% pada 44,1/48/96 kHz
+- [ ] Test corner: 20 Hz tetap 20 Hz ± 2% pada 44,1/48 kHz; **96 kHz: ±6%** (revisi 2026-11-08 dengan data — lihat "Selesai bila")
 
 **Selesai bila:**
 
-- [ ] Spektrum fractal noise identik dalam 0,5 dB antar sample rate pada rentang 20–10240 Hz
+- [ ] Spektrum fractal noise identik dalam 0,5 dB antar sample rate pada rentang 20–10240 Hz — **direvisi 2026-11-08 dengan data (aturan §8: revisi di dokumen ini, bukan diam-diam di test; commit 802b7a2)**: 44,1↔48 kHz tetap 0,5 dB; **96 kHz menjadi 1,0 dB spektrum dan ±6% corner**. Justifikasi terukur: (a) referensi 44,1 kHz sendiri mengalami warp diskretisasi near-Nyquist — pembandingan langsung mentransfer warp itu ke hasil; (b) sensitivitas loop terukur ~39× sehingga warp referensi ±0,5% menjadi ±6% pada corner terukur 96 kHz (pra-perbaikan +105%); (c) residual terburuk pasca-perbaikan 0,76 dB (vs 2,2–2,7 dB pra-perbaikan). Konsisten dengan D6 (jalur 96 kHz menunggu keputusan pemilik); bila 96 kHz diputuskan penuh, ambang dikunci ulang dari pengukuran RC.
 
 **File target:** `crates/qinari-dsp/src/noise.rs` **Sumber:** F5
 

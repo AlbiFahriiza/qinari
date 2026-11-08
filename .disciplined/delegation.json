@@ -62,7 +62,7 @@
       "subagent": "general-purpose (opus)",
       "difficulty": "high",
       "fit": "hard DSP + primary-source derivation; must verify every parameter against the paper text before freeze",
-      "gated": false
+      "gated": true
     },
     {
       "id": "FA-S2",
@@ -70,7 +70,7 @@
       "subagent": "general-purpose (opus)",
       "difficulty": "high",
       "fit": "L-sized DSP rewrite with measurement-based exit criteria; needs careful math and new test harness",
-      "gated": false
+      "gated": true
     },
     {
       "id": "FA-S3",
@@ -78,7 +78,7 @@
       "subagent": "general-purpose (opus)",
       "difficulty": "medium-high",
       "fit": "DSP redesign + benchmark/CI harness engineering; mechanical but gate-heavy and evidence-critical",
-      "gated": false
+      "gated": true
     },
     {
       "id": "FA-S4",
@@ -86,7 +86,7 @@
       "subagent": "general-purpose (opus)",
       "difficulty": "medium-high",
       "fit": "docs discipline + provenance-critical downloads; no code changes, heavy verification bookkeeping",
-      "gated": false
+      "gated": true
     }
   ]
 }

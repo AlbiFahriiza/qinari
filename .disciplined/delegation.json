@@ -55,6 +55,38 @@
       "difficulty": "high",
       "fit": "deep web+code research; report-only",
       "gated": true
+    },
+    {
+      "id": "FA-S1",
+      "task": "P0-2 verifier C/C1/C2: re-derive filterbank parameters from primary [S1] into docs/VERIFICATION-0.2.0.md, cochlea.rs, modulation.rs rewrite, AC labeled Qinari extension",
+      "subagent": "general-purpose (opus)",
+      "difficulty": "high",
+      "fit": "hard DSP + primary-source derivation; must verify every parameter against the paper text before freeze",
+      "gated": false
+    },
+    {
+      "id": "FA-S2",
+      "task": "P0-1 ModalBank exact damped-sinusoid rewrite + excitation projection + strike position + global-gain-only normalization + preset migration (qinari-dsp modal.rs, qinari-sfx recipes.rs presets)",
+      "subagent": "general-purpose (opus)",
+      "difficulty": "high",
+      "fit": "L-sized DSP rewrite with measurement-based exit criteria; needs careful math and new test harness",
+      "gated": false
+    },
+    {
+      "id": "FA-S3",
+      "task": "P0-6 sample-rate invariance (NoiseGen::fractal + dsp audit) and P0-8 locked 0.1.5 regression baseline (render script, JSON, CI comparison job, class-4 issue notes)",
+      "subagent": "general-purpose (opus)",
+      "difficulty": "medium-high",
+      "fit": "DSP redesign + benchmark/CI harness engineering; mechanical but gate-heavy and evidence-critical",
+      "gated": false
+    },
+    {
+      "id": "FA-S4",
+      "task": "P0-7 documentation/manifest synchronization and P0-4 part 1: CC0 corpus acquisition (10-20 recordings x 6+ categories, provenance manifest, 3-way split)",
+      "subagent": "general-purpose (opus)",
+      "difficulty": "medium-high",
+      "fit": "docs discipline + provenance-critical downloads; no code changes, heavy verification bookkeeping",
+      "gated": false
     }
   ]
 }

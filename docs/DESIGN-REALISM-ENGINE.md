@@ -148,7 +148,17 @@ Features (all pure functions over `AudioBuffer`):
 - `band_envelopes`: N-band (≈24) Hilbert-ish envelopes via STFT
   magnitudes; moments (mean, variance, sparsity/kurtosis).
 - `modulation_spectrum`: envelope spectra per band + cross-band
-  correlation matrix (the McDermott C1/AC statistics — §R 1.1).
+  correlation matrix — the legacy STFT-band form of the texture model's
+  **C** statistic. 0.1.5 mislabeled it "McDermott C1" (finding F13,
+  §R 1.1); the true C1/C2 arrived in 0.2.0 (below).
+- `texture_stats` (0.2.0, P0-2): the McDermott–Simoncelli 2011
+  statistics on a 32-channel ERB cochlear front-end — 1515 numbers:
+  cochlear marginals M1–M4, **C** cross-band correlations, modulation
+  power, **C1** cross-frequency and complex **C2** across-band
+  correlations — plus **AC**, labeled a Qinari extension (not part of
+  the 2011 model's 1515). Every parameter re-derived from the primary
+  source and frozen with citations in
+  `docs/VERIFICATION-0.2.0.md` (plan §7.5 P0-2).
 - `event_stats`: onset detection by envelope derivative (pure Rust,
   ~50 lines — aubio rejected, §R 4.4): rate, inter-onset CV, burstiness.
 - `loudness`: reuse `qinari-dsp::lufs`.

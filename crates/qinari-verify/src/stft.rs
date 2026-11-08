@@ -119,6 +119,28 @@ pub(crate) fn bin_weight(k: usize, bins: usize) -> f64 {
     }
 }
 
+/// Analytic signal `b + i·Hilbert(b)` of a real band given its one-sided
+/// spectrum: the two-sided spectrum keeps DC and Nyquist, doubles the
+/// interior positive bins, and zeroes the negative mirror; the rustfft
+/// inverse is unnormalized, so the result is scaled by `1/frames`.
+pub(crate) fn analytic_signal(one_sided: &[Complex64], frames: usize) -> Vec<Complex64> {
+    let mut planner = rustfft::FftPlanner::new();
+    let inverse = planner.plan_fft_inverse(frames);
+    let mut buffer = vec![Complex64::new(0.0, 0.0); frames];
+    for (j, slot) in buffer.iter_mut().enumerate() {
+        if j <= frames / 2 {
+            let unpaired = j == 0 || 2 * j == frames;
+            *slot = one_sided[j] * if unpaired { 1.0 } else { 2.0 };
+        }
+    }
+    inverse.process(&mut buffer);
+    let scale = 1.0 / frames as f64;
+    for bin in &mut buffer {
+        *bin *= scale;
+    }
+    buffer
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,5 +219,35 @@ mod tests {
         assert_eq!(bin_weight(512, 513), 1.0);
         assert_eq!(bin_weight(1, 513), 2.0);
         assert_eq!(bin_weight(511, 513), 2.0);
+    }
+
+    #[test]
+    fn analytic_signal_of_an_on_bin_cosine_is_a_complex_exponential() {
+        // cos(2*pi*k*t/N) has a one-bin spectrum; its analytic signal is
+        // e^{i*2*pi*k*t/N} with unit magnitude everywhere.
+        let n = 16usize;
+        let k = 3usize;
+        let block: Vec<f64> = (0..n)
+            .map(|t| (2.0 * std::f64::consts::PI * k as f64 * t as f64 / n as f64).cos())
+            .collect();
+        let spectrum = real_fft(&block);
+        let analytic = analytic_signal(&spectrum, n);
+        for (t, a) in analytic.iter().enumerate() {
+            let expected = 2.0 * std::f64::consts::PI * k as f64 * t as f64 / n as f64;
+            assert!((a.re - expected.cos()).abs() < 1e-12, "re at {t}");
+            assert!((a.im - expected.sin()).abs() < 1e-12, "im at {t}");
+        }
+        // Odd length: same property, no Nyquist bin exists.
+        let n = 15usize;
+        let k = 2usize;
+        let block: Vec<f64> = (0..n)
+            .map(|t| (2.0 * std::f64::consts::PI * k as f64 * t as f64 / n as f64).cos())
+            .collect();
+        let analytic = analytic_signal(&real_fft(&block), n);
+        for (t, a) in analytic.iter().enumerate() {
+            let expected = 2.0 * std::f64::consts::PI * k as f64 * t as f64 / n as f64;
+            assert!((a.re - expected.cos()).abs() < 1e-12, "odd re at {t}");
+            assert!((a.im - expected.sin()).abs() < 1e-12, "odd im at {t}");
+        }
     }
 }

@@ -14,7 +14,16 @@
 //!   their moments (mean, variance, sparsity, kurtosis);
 //! - [`modulation`]: envelope spectra per band, the broadband gain
 //!   modulation summary (the exactly-periodic-LFO discriminator), and the
-//!   cross-band correlation matrix (`McDermott` C1 statistics);
+//!   cross-band correlation matrix — the legacy STFT-band form of the
+//!   texture model's **C** statistic (the 0.1.5 docs mislabeled it as
+//!   the paper's C1; finding F13);
+//! - [`texture_stats`]: the McDermott–Simoncelli 2011 texture statistics
+//!   on a 32-channel ERB cochlear front-end — cochlear marginal moments
+//!   M1–M4, **C** cross-band correlations, modulation power, **C1**
+//!   cross-frequency and complex **C2** across-band correlations (1515
+//!   statistics; every parameter frozen with paper citations in
+//!   `docs/VERIFICATION-0.2.0.md`), plus **AC**, labeled a Qinari
+//!   extension because it is not part of the 2011 model;
 //! - [`events`]: onset detection by envelope derivative, event rate,
 //!   inter-onset CV, burstiness;
 //! - [`interaural`]: interaural correlation per named band (the §7
@@ -43,6 +52,7 @@
 
 #![forbid(unsafe_code)]
 
+pub(crate) mod cochlea;
 pub mod distances;
 pub mod dnsmos;
 pub mod envelopes;
@@ -60,7 +70,7 @@ pub use envelopes::{BandMoments, EnvelopeReport};
 pub use events::EventReport;
 pub use golden::{check_against, load_target, TargetFile, Tolerance, Violation};
 pub use interaural::InterauralReport;
-pub use modulation::{BandModulation, ModulationReport};
+pub use modulation::{BandModulation, ModulationReport, TextureStats};
 pub use qinari_audio::decode_audio;
 pub use report::FeatureReport;
 pub use spectrum::{BandFractions, SpectrumReport};
@@ -150,6 +160,25 @@ pub fn analyze_buffer(buffer: &AudioBuffer) -> FeatureReport {
         interaural,
         speech,
     }
+}
+
+/// Measures the 2011 McDermott–Simoncelli texture statistics of a
+/// buffer: the full 1515-number set (cochlear marginals M1–M4, C
+/// cross-band correlations, marginal-bank modulation power, C1
+/// cross-frequency and complex C2 across-band correlations) on the
+/// 32-channel ERB cochlear front-end, plus the AC (Qinari extension)
+/// envelope autocorrelations.
+///
+/// The cochlear front-end analyzes at the buffer's native sample rate
+/// (clipped to the 2011 span of 20–10000 Hz); every parameter is frozen
+/// with its primary-source citation in `docs/VERIFICATION-0.2.0.md`.
+/// Deterministic: the same buffer always produces the same numbers.
+/// Degenerate inputs (empty buffers, rates without cochlear resolution,
+/// silence) measure all zeros, never NaN.
+pub fn texture_stats(buffer: &AudioBuffer) -> TextureStats {
+    let mono = mono_mixdown(buffer);
+    let gram = cochlea::analyze(&mono, buffer.sample_rate());
+    modulation::texture_stats(&gram)
 }
 
 /// Decodes a `.wav`/`.mp3` file and analyzes it.

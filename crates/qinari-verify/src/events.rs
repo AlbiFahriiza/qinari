@@ -142,6 +142,25 @@ pub(crate) fn analyze(gain_db: &[f64], env_rate: f64) -> EventReport {
     }
 }
 
+/// Median-across-channels event report: the aggregate of the per-channel
+/// event sections (the stereo-aware contract of `crate::analyze_buffer`).
+///
+/// Optional interval statistics (mean interval, CV, burstiness) quote
+/// only when every channel quotes them — one channel below its
+/// two-event floor withholds the aggregate too. `count` medians round
+/// to nearest (ties away from zero), which is exact for one channel and
+/// for two equal channels.
+pub(crate) fn aggregate(reports: &[EventReport]) -> EventReport {
+    let mut scratch = Vec::with_capacity(reports.len());
+    EventReport {
+        count: crate::median_stat(&mut scratch, reports, |r| r.count as f64).round() as usize,
+        rate_hz: crate::median_stat(&mut scratch, reports, |r| r.rate_hz),
+        mean_interval_s: crate::median_option(&mut scratch, reports, |r| r.mean_interval_s),
+        interval_cv: crate::median_option(&mut scratch, reports, |r| r.interval_cv),
+        burstiness: crate::median_option(&mut scratch, reports, |r| r.burstiness),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

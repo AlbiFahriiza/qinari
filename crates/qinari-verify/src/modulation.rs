@@ -258,6 +258,48 @@ pub(crate) fn analyze(data: &EnvelopeData) -> ModulationReport {
     }
 }
 
+/// Median-across-channels modulation report: the aggregate of the
+/// per-channel modulation sections (the stereo-aware contract of
+/// `crate::analyze_buffer`).
+///
+/// # Panics
+///
+/// Panics if `reports` is empty — a programming error: the zero-channel
+/// case synthesizes one silent channel, so callers always pass at least
+/// one report.
+pub(crate) fn aggregate(reports: &[ModulationReport]) -> ModulationReport {
+    let first = reports.first().expect("at least one channel report");
+    let mut scratch = Vec::with_capacity(reports.len());
+    // Same sample rate -> the same band set in every channel, so every
+    // per-channel vector matches the first report in shape.
+    let per_band = (0..first.per_band.len())
+        .map(|b| BandModulation {
+            peak_mean_ratio: crate::median_stat(&mut scratch, reports, |r| {
+                r.per_band[b].peak_mean_ratio
+            }),
+            peak_hz: crate::median_stat(&mut scratch, reports, |r| r.per_band[b].peak_hz),
+        })
+        .collect();
+    let cross_band_correlation = (0..first.cross_band_correlation.len())
+        .map(|i| {
+            (0..first.cross_band_correlation[i].len())
+                .map(|j| {
+                    crate::median_stat(&mut scratch, reports, |r| r.cross_band_correlation[i][j])
+                })
+                .collect()
+        })
+        .collect();
+    ModulationReport {
+        per_band,
+        gain_peak_mean_ratio: crate::median_stat(&mut scratch, reports, |r| r.gain_peak_mean_ratio),
+        gain_peak_hz: crate::median_stat(&mut scratch, reports, |r| r.gain_peak_hz),
+        gain_spectrum_0_20hz: (0..first.gain_spectrum_0_20hz.len())
+            .map(|k| crate::median_stat(&mut scratch, reports, |r| r.gain_spectrum_0_20hz[k]))
+            .collect(),
+        cross_band_correlation,
+    }
+}
+
 // ---- The 2011 texture statistics (VERIFICATION-0.2.0.md §§C–D) ----
 
 /// Center frequencies of the marginal bank: 20 filters equally spaced
@@ -658,6 +700,53 @@ pub(crate) fn texture_stats(gram: &Cochleagram) -> TextureStats {
         c1,
         c2: work.c2,
         ac: ac_correlations(w, &centered, &vars),
+    }
+}
+
+/// Median-across-channels texture statistics: the aggregate of the
+/// per-channel 2011 statistics (the stereo-aware contract of
+/// `crate::texture_stats`).
+///
+/// # Panics
+///
+/// Panics if `stats` is empty — a programming error: the zero-channel
+/// case synthesizes one silent channel, so callers always pass at least
+/// one entry.
+pub(crate) fn aggregate_texture(stats: &[TextureStats]) -> TextureStats {
+    let first = stats.first().expect("at least one channel report");
+    let mut scratch = Vec::with_capacity(stats.len());
+    // Same sample rate -> the same frozen cochlear bank in every
+    // channel, so every per-channel vector matches the first entry in
+    // shape.
+    let marginal = (0..first.marginal.len())
+        .map(|k| {
+            [0, 1, 2, 3].map(|m| crate::median_stat(&mut scratch, stats, |s| s.marginal[k][m]))
+        })
+        .collect();
+    let c = (0..first.c.len())
+        .map(|i| crate::median_stat(&mut scratch, stats, |s| s.c[i]))
+        .collect();
+    let mod_power = (0..first.mod_power.len())
+        .map(|i| crate::median_stat(&mut scratch, stats, |s| s.mod_power[i]))
+        .collect();
+    let c1 = (0..first.c1.len())
+        .map(|i| crate::median_stat(&mut scratch, stats, |s| s.c1[i]))
+        .collect();
+    let c2 = (0..first.c2.len())
+        .map(|k| [0, 1].map(|p| crate::median_stat(&mut scratch, stats, |s| s.c2[k][p])))
+        .collect();
+    let ac = (0..first.ac.len())
+        .map(|i| crate::median_stat(&mut scratch, stats, |s| s.ac[i]))
+        .collect();
+    TextureStats {
+        // The frozen cochlear bank: identical across channels.
+        center_hz: first.center_hz.clone(),
+        marginal,
+        c,
+        mod_power,
+        c1,
+        c2,
+        ac,
     }
 }
 

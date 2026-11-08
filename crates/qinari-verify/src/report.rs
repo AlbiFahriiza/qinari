@@ -22,17 +22,38 @@ pub struct FeatureReport {
     pub channels: usize,
     /// Duration in seconds.
     pub duration_s: f64,
-    /// Spectral features (Welch, `rolloff95`, band energies).
+    /// Spectral features (Welch, `rolloff95`, band energies) — the
+    /// per-statistic median across channels.
     pub spectrum: SpectrumReport,
-    /// Band envelope moments.
+    /// Channel 0 ("L") spectral features.
+    pub spectrum_l: SpectrumReport,
+    /// Channel 1 ("R") spectral features (`None` for mono).
+    pub spectrum_r: Option<SpectrumReport>,
+    /// Band envelope moments — the per-statistic median across channels.
     pub envelopes: EnvelopeReport,
-    /// Modulation and cross-band statistics.
+    /// Channel 0 ("L") band envelope moments.
+    pub envelopes_l: EnvelopeReport,
+    /// Channel 1 ("R") band envelope moments (`None` for mono).
+    pub envelopes_r: Option<EnvelopeReport>,
+    /// Modulation and cross-band statistics — the per-statistic median
+    /// across channels.
     pub modulation: ModulationReport,
-    /// Event statistics.
+    /// Channel 0 ("L") modulation and cross-band statistics.
+    pub modulation_l: ModulationReport,
+    /// Channel 1 ("R") modulation and cross-band statistics (`None`
+    /// for mono).
+    pub modulation_r: Option<ModulationReport>,
+    /// Event statistics — the per-statistic median across channels.
     pub events: EventReport,
-    /// Interaural correlations (`None` for mono buffers).
+    /// Channel 0 ("L") event statistics.
+    pub events_l: EventReport,
+    /// Channel 1 ("R") event statistics (`None` for mono).
+    pub events_r: Option<EventReport>,
+    /// Interaural correlations per band (`None` for mono buffers) —
+    /// cross-channel by definition.
     pub interaural: Option<InterauralReport>,
-    /// Speech features (F0, pauses).
+    /// Speech features (F0, pauses) — on the mono mixdown:
+    /// monophonic by definition (one voice).
     pub speech: SpeechReport,
 }
 
@@ -51,179 +72,266 @@ fn push_slice(out: &mut Vec<FlatValue>, prefix: &str, values: &[f64]) {
     }
 }
 
+/// Pushes a fixed-length vector section, or `len` nulls for an absent
+/// section — keeps the golden address space present for mono buffers
+/// (the interaural convention).
+fn push_fixed(out: &mut Vec<FlatValue>, prefix: &str, len: usize, values: Option<&[f64]>) {
+    match values {
+        Some(values) if values.len() == len => push_slice(out, prefix, values),
+        _ => {
+            for i in 0..len {
+                push(out, &format!("{prefix}.{i}"), None);
+            }
+        }
+    }
+}
+
+/// Pushes a fixed `rows` x `cols` matrix section, or nulls when absent
+/// (see [`push_fixed`]).
+fn push_matrix(
+    out: &mut Vec<FlatValue>,
+    prefix: &str,
+    rows: usize,
+    cols: usize,
+    matrix: Option<&[Vec<f64>]>,
+) {
+    let well_shaped = |m: &[Vec<f64>]| m.len() == rows && m.iter().all(|r| r.len() == cols);
+    match matrix {
+        Some(m) if well_shaped(m) => {
+            for (i, row) in m.iter().enumerate() {
+                push_slice(out, &format!("{prefix}.{i}"), row);
+            }
+        }
+        _ => {
+            for i in 0..rows {
+                for j in 0..cols {
+                    push(out, &format!("{prefix}.{i}.{j}"), None);
+                }
+            }
+        }
+    }
+}
+
+/// Pushes a spectrum section (aggregate or per-channel).
+fn push_spectrum(out: &mut Vec<FlatValue>, prefix: &str, section: Option<&SpectrumReport>) {
+    push(
+        out,
+        &format!("{prefix}.rolloff95_hz"),
+        section.map(|s| s.rolloff95_hz),
+    );
+    push(
+        out,
+        &format!("{prefix}.band_energy_fraction.b0_500"),
+        section.map(|s| s.band_energy_fraction.b0_500),
+    );
+    push(
+        out,
+        &format!("{prefix}.band_energy_fraction.b500_2000"),
+        section.map(|s| s.band_energy_fraction.b500_2000),
+    );
+    push(
+        out,
+        &format!("{prefix}.band_energy_fraction.b2000_8000"),
+        section.map(|s| s.band_energy_fraction.b2000_8000),
+    );
+    push(
+        out,
+        &format!("{prefix}.band_energy_fraction.b8000_nyquist"),
+        section.map(|s| s.band_energy_fraction.b8000_nyquist),
+    );
+    push_fixed(
+        out,
+        &format!("{prefix}.bands24_energy_fraction"),
+        24,
+        section.map(|s| s.bands24_energy_fraction.as_slice()),
+    );
+}
+
+/// Pushes the per-band moments of an envelope section. Band edges are
+/// sample-rate constants (identical across channels), so only the
+/// aggregate section carries them — the per-channel sections skip the
+/// redundant copy.
+fn push_envelope_bands(out: &mut Vec<FlatValue>, prefix: &str, section: Option<&EnvelopeReport>) {
+    for i in 0..24 {
+        let band = section.and_then(|s| s.bands.get(i));
+        push(
+            out,
+            &format!("{prefix}.bands.{i}.mean_db"),
+            band.map(|b| b.mean_db),
+        );
+        push(
+            out,
+            &format!("{prefix}.bands.{i}.variance"),
+            band.map(|b| b.variance),
+        );
+        push(
+            out,
+            &format!("{prefix}.bands.{i}.sparsity"),
+            band.map(|b| b.sparsity),
+        );
+        push(
+            out,
+            &format!("{prefix}.bands.{i}.kurtosis_excess"),
+            band.map(|b| b.kurtosis_excess),
+        );
+    }
+}
+
+/// Pushes a modulation section (aggregate or per-channel).
+fn push_modulation(out: &mut Vec<FlatValue>, prefix: &str, section: Option<&ModulationReport>) {
+    for i in 0..24 {
+        let band = section.and_then(|s| s.per_band.get(i));
+        push(
+            out,
+            &format!("{prefix}.per_band.{i}.peak_mean_ratio"),
+            band.map(|b| b.peak_mean_ratio),
+        );
+        push(
+            out,
+            &format!("{prefix}.per_band.{i}.peak_hz"),
+            band.map(|b| b.peak_hz),
+        );
+    }
+    push(
+        out,
+        &format!("{prefix}.gain_peak_mean_ratio"),
+        section.map(|s| s.gain_peak_mean_ratio),
+    );
+    push(
+        out,
+        &format!("{prefix}.gain_peak_hz"),
+        section.map(|s| s.gain_peak_hz),
+    );
+    push_fixed(
+        out,
+        &format!("{prefix}.gain_spectrum_0_20hz"),
+        64,
+        section.map(|s| s.gain_spectrum_0_20hz.as_slice()),
+    );
+    push_matrix(
+        out,
+        &format!("{prefix}.cross_band_correlation"),
+        24,
+        24,
+        section.map(|s| s.cross_band_correlation.as_slice()),
+    );
+}
+
+/// Pushes an event section (aggregate or per-channel).
+fn push_events(out: &mut Vec<FlatValue>, prefix: &str, section: Option<&EventReport>) {
+    push(
+        out,
+        &format!("{prefix}.count"),
+        section.map(|s| s.count as f64),
+    );
+    push(
+        out,
+        &format!("{prefix}.rate_hz"),
+        section.map(|s| s.rate_hz),
+    );
+    push(
+        out,
+        &format!("{prefix}.mean_interval_s"),
+        section.and_then(|s| s.mean_interval_s),
+    );
+    push(
+        out,
+        &format!("{prefix}.interval_cv"),
+        section.and_then(|s| s.interval_cv),
+    );
+    push(
+        out,
+        &format!("{prefix}.burstiness"),
+        section.and_then(|s| s.burstiness),
+    );
+}
+
+/// Pushes the interaural section. Cross-channel by definition, so it
+/// has no per-channel variants; an absent section (mono) flattens to
+/// nulls, the interaural convention.
+fn push_interaural(out: &mut Vec<FlatValue>, section: Option<&InterauralReport>) {
+    push(out, "interaural.b0_500", section.map(|s| s.b0_500));
+    push(out, "interaural.b500_2000", section.map(|s| s.b500_2000));
+    push(out, "interaural.b2000_8000", section.map(|s| s.b2000_8000));
+    push(
+        out,
+        "interaural.b8000_nyquist",
+        section.map(|s| s.b8000_nyquist),
+    );
+    for i in 0..24 {
+        let value = section.and_then(|s| s.per_band.get(i).copied());
+        push(out, &format!("interaural.per_band.{i}"), value);
+    }
+}
+
+/// Pushes the speech section. Monophonic by definition (one voice, on
+/// the mixdown), so it has no per-channel variants.
+fn push_speech(out: &mut Vec<FlatValue>, speech: &SpeechReport) {
+    push(
+        out,
+        "speech.f0.voiced_frames",
+        Some(speech.f0.voiced_frames as f64),
+    );
+    push(
+        out,
+        "speech.f0.voiced_fraction",
+        Some(speech.f0.voiced_fraction),
+    );
+    push(out, "speech.f0.f0_mean_hz", speech.f0.f0_mean_hz);
+    push(out, "speech.f0.f0_sigma_st", speech.f0.f0_sigma_st);
+    push(out, "speech.f0.f0_range_st", speech.f0.f0_range_st);
+    push(out, "speech.pauses.count", Some(speech.pauses.count as f64));
+    push(out, "speech.pauses.total_s", Some(speech.pauses.total_s));
+    push(
+        out,
+        "speech.pauses.rate_per_min",
+        Some(speech.pauses.rate_per_min),
+    );
+    push(
+        out,
+        "speech.pauses.mean_duration_s",
+        speech.pauses.mean_duration_s,
+    );
+}
+
 impl FeatureReport {
     /// Flattens the report into `(dotted path, value)` pairs.
     ///
     /// Paths follow the JSON field names, e.g.
     /// `spectrum.rolloff95_hz`, `envelopes.bands.7.sparsity`,
     /// `modulation.cross_band_correlation.3.12`, `events.interval_cv`,
-    /// `interaural.b500_2000`, `speech.f0.f0_sigma_st`.
-    // A flat serialization table: one push per named field, in report
-    // order, exactly like a hand-written `Serialize` impl. Splitting it
-    // per section would scatter the path namespace across helpers without
-    // making any single piece simpler (documented allow per
-    // CHECKPOINT_RULES gate 2).
-    #[allow(clippy::too_many_lines)]
+    /// `interaural.b500_2000`, `speech.f0.f0_sigma_st`. Per-channel
+    /// sections use the same names suffixed `_l` / `_r`, e.g.
+    /// `spectrum_r.rolloff95_hz` (`null` for mono, like `interaural`).
+    // One push per named field, in report order; the section helpers
+    // hold the shared path tables, so a field name exists in exactly
+    // one place (CHECKPOINT_RULES gate 2: one table, no scattering).
     pub fn flatten(&self) -> Vec<FlatValue> {
-        let mut out = Vec::with_capacity(900);
+        // Aggregate (~900) + two per-channel sections (~1660).
+        let mut out = Vec::with_capacity(2560);
         push(&mut out, "sample_rate", Some(f64::from(self.sample_rate)));
         push(&mut out, "frames", Some(self.frames as f64));
         push(&mut out, "channels", Some(self.channels as f64));
         push(&mut out, "duration_s", Some(self.duration_s));
-        push(
-            &mut out,
-            "spectrum.rolloff95_hz",
-            Some(self.spectrum.rolloff95_hz),
-        );
-        push(
-            &mut out,
-            "spectrum.band_energy_fraction.b0_500",
-            Some(self.spectrum.band_energy_fraction.b0_500),
-        );
-        push(
-            &mut out,
-            "spectrum.band_energy_fraction.b500_2000",
-            Some(self.spectrum.band_energy_fraction.b500_2000),
-        );
-        push(
-            &mut out,
-            "spectrum.band_energy_fraction.b2000_8000",
-            Some(self.spectrum.band_energy_fraction.b2000_8000),
-        );
-        push(
-            &mut out,
-            "spectrum.band_energy_fraction.b8000_nyquist",
-            Some(self.spectrum.band_energy_fraction.b8000_nyquist),
-        );
-        push_slice(
-            &mut out,
-            "spectrum.bands24_energy_fraction",
-            &self.spectrum.bands24_energy_fraction,
-        );
+        push_spectrum(&mut out, "spectrum", Some(&self.spectrum));
+        push_spectrum(&mut out, "spectrum_l", Some(&self.spectrum_l));
+        push_spectrum(&mut out, "spectrum_r", self.spectrum_r.as_ref());
         push_slice(
             &mut out,
             "envelopes.band_edge_hz",
             &self.envelopes.band_edge_hz,
         );
-        for (i, band) in self.envelopes.bands.iter().enumerate() {
-            push(
-                &mut out,
-                &format!("envelopes.bands.{i}.mean_db"),
-                Some(band.mean_db),
-            );
-            push(
-                &mut out,
-                &format!("envelopes.bands.{i}.variance"),
-                Some(band.variance),
-            );
-            push(
-                &mut out,
-                &format!("envelopes.bands.{i}.sparsity"),
-                Some(band.sparsity),
-            );
-            push(
-                &mut out,
-                &format!("envelopes.bands.{i}.kurtosis_excess"),
-                Some(band.kurtosis_excess),
-            );
-        }
-        for (i, band) in self.modulation.per_band.iter().enumerate() {
-            push(
-                &mut out,
-                &format!("modulation.per_band.{i}.peak_mean_ratio"),
-                Some(band.peak_mean_ratio),
-            );
-            push(
-                &mut out,
-                &format!("modulation.per_band.{i}.peak_hz"),
-                Some(band.peak_hz),
-            );
-        }
-        push(
-            &mut out,
-            "modulation.gain_peak_mean_ratio",
-            Some(self.modulation.gain_peak_mean_ratio),
-        );
-        push(
-            &mut out,
-            "modulation.gain_peak_hz",
-            Some(self.modulation.gain_peak_hz),
-        );
-        push_slice(
-            &mut out,
-            "modulation.gain_spectrum_0_20hz",
-            &self.modulation.gain_spectrum_0_20hz,
-        );
-        for (i, row) in self.modulation.cross_band_correlation.iter().enumerate() {
-            push_slice(
-                &mut out,
-                &format!("modulation.cross_band_correlation.{i}"),
-                row,
-            );
-        }
-        push(&mut out, "events.count", Some(self.events.count as f64));
-        push(&mut out, "events.rate_hz", Some(self.events.rate_hz));
-        push(
-            &mut out,
-            "events.mean_interval_s",
-            self.events.mean_interval_s,
-        );
-        push(&mut out, "events.interval_cv", self.events.interval_cv);
-        push(&mut out, "events.burstiness", self.events.burstiness);
-        let interaural = match &self.interaural {
-            Some(report) => (
-                Some(report.b0_500),
-                Some(report.b500_2000),
-                Some(report.b2000_8000),
-                Some(report.b8000_nyquist),
-            ),
-            None => (None, None, None, None),
-        };
-        push(&mut out, "interaural.b0_500", interaural.0);
-        push(&mut out, "interaural.b500_2000", interaural.1);
-        push(&mut out, "interaural.b2000_8000", interaural.2);
-        push(&mut out, "interaural.b8000_nyquist", interaural.3);
-        push(
-            &mut out,
-            "speech.f0.voiced_frames",
-            Some(self.speech.f0.voiced_frames as f64),
-        );
-        push(
-            &mut out,
-            "speech.f0.voiced_fraction",
-            Some(self.speech.f0.voiced_fraction),
-        );
-        push(&mut out, "speech.f0.f0_mean_hz", self.speech.f0.f0_mean_hz);
-        push(
-            &mut out,
-            "speech.f0.f0_sigma_st",
-            self.speech.f0.f0_sigma_st,
-        );
-        push(
-            &mut out,
-            "speech.f0.f0_range_st",
-            self.speech.f0.f0_range_st,
-        );
-        push(
-            &mut out,
-            "speech.pauses.count",
-            Some(self.speech.pauses.count as f64),
-        );
-        push(
-            &mut out,
-            "speech.pauses.total_s",
-            Some(self.speech.pauses.total_s),
-        );
-        push(
-            &mut out,
-            "speech.pauses.rate_per_min",
-            Some(self.speech.pauses.rate_per_min),
-        );
-        push(
-            &mut out,
-            "speech.pauses.mean_duration_s",
-            self.speech.pauses.mean_duration_s,
-        );
+        push_envelope_bands(&mut out, "envelopes", Some(&self.envelopes));
+        push_envelope_bands(&mut out, "envelopes_l", Some(&self.envelopes_l));
+        push_envelope_bands(&mut out, "envelopes_r", self.envelopes_r.as_ref());
+        push_modulation(&mut out, "modulation", Some(&self.modulation));
+        push_modulation(&mut out, "modulation_l", Some(&self.modulation_l));
+        push_modulation(&mut out, "modulation_r", self.modulation_r.as_ref());
+        push_events(&mut out, "events", Some(&self.events));
+        push_events(&mut out, "events_l", Some(&self.events_l));
+        push_events(&mut out, "events_r", self.events_r.as_ref());
+        push_interaural(&mut out, self.interaural.as_ref());
+        push_speech(&mut out, &self.speech);
         out
     }
 }

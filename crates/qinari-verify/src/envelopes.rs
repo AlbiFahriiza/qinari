@@ -52,7 +52,11 @@ pub struct EnvelopeReport {
 pub(crate) struct EnvelopeData {
     /// Envelope frame rate in hertz (`sample_rate / 256`).
     pub env_rate: f64,
-    /// Per-band dB envelopes: 24 bands x frames.
+    /// Per-band dB envelopes: 24 bands x frames, band-major (one row per
+    /// band) so the modulation extractor reads the series of each band
+    /// directly. The 0.1.x layout stored frame-major rows, which made
+    /// `per_band` and the cross-band matrix grow with buffer length
+    /// instead of following the fixed 24-band set.
     pub band_db: Vec<Vec<f64>>,
     /// Full-band dB envelope (frames).
     pub gain_db: Vec<f64>,
@@ -161,16 +165,15 @@ pub(crate) fn analyze(mono: &[f32], sample_rate: u32) -> (EnvelopeReport, Envelo
         gain_power[t] = total;
     }
 
-    let band_db: Vec<Vec<f64>> = band_power
-        .iter()
-        .map(|series| series.iter().map(|&p| to_db(p)).collect())
+    let band_db: Vec<Vec<f64>> = (0..band_count)
+        .map(|b| (0..frame_total).map(|t| to_db(band_power[t][b])).collect())
         .collect();
     let gain_db: Vec<f64> = gain_power.iter().map(|&p| to_db(p)).collect();
 
     let mut report_bands = Vec::with_capacity(band_count);
     for b in 0..band_count {
-        let db_series: Vec<f64> = band_db.iter().map(|f| f[b]).collect();
-        let (mean, var) = mean_variance(&db_series);
+        let db_series = &band_db[b];
+        let (mean, var) = mean_variance(db_series);
         let linear: Vec<f64> = (0..frame_total).map(|t| band_power[t][b]).collect();
         report_bands.push(BandMoments {
             edge_lo_hz: edges[b],
@@ -178,7 +181,7 @@ pub(crate) fn analyze(mono: &[f32], sample_rate: u32) -> (EnvelopeReport, Envelo
             mean_db: mean,
             variance: var,
             sparsity: hoyer_sparsity(&linear),
-            kurtosis_excess: kurtosis_excess(&db_series, mean, var),
+            kurtosis_excess: kurtosis_excess(db_series, mean, var),
         });
     }
 
@@ -192,6 +195,40 @@ pub(crate) fn analyze(mono: &[f32], sample_rate: u32) -> (EnvelopeReport, Envelo
         gain_db,
     };
     (report, data)
+}
+
+/// Median-across-channels envelope report: the aggregate of the
+/// per-channel envelope sections (the stereo-aware contract of
+/// `crate::analyze_buffer`).
+///
+/// # Panics
+///
+/// Panics if `reports` is empty — a programming error: the zero-channel
+/// case synthesizes one silent channel, so callers always pass at least
+/// one report.
+pub(crate) fn aggregate(reports: &[EnvelopeReport]) -> EnvelopeReport {
+    let first = reports.first().expect("at least one channel report");
+    let mut scratch = Vec::with_capacity(reports.len());
+    let band_count = first.bands.len();
+    let mut bands = Vec::with_capacity(band_count);
+    for b in 0..band_count {
+        // Same sample rate -> the same band set in every channel.
+        bands.push(BandMoments {
+            // Sample-rate constants: identical in every channel.
+            edge_lo_hz: first.bands[b].edge_lo_hz,
+            edge_hi_hz: first.bands[b].edge_hi_hz,
+            mean_db: crate::median_stat(&mut scratch, reports, |r| r.bands[b].mean_db),
+            variance: crate::median_stat(&mut scratch, reports, |r| r.bands[b].variance),
+            sparsity: crate::median_stat(&mut scratch, reports, |r| r.bands[b].sparsity),
+            kurtosis_excess: crate::median_stat(&mut scratch, reports, |r| {
+                r.bands[b].kurtosis_excess
+            }),
+        });
+    }
+    EnvelopeReport {
+        band_edge_hz: first.band_edge_hz.clone(),
+        bands,
+    }
 }
 
 #[cfg(test)]

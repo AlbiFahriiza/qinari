@@ -174,6 +174,42 @@ pub(crate) fn analyze(mono: &[f32], sample_rate: u32) -> SpectrumReport {
     }
 }
 
+/// Median-across-channels spectrum: the aggregate of the per-channel
+/// spectra (the stereo-aware contract of `crate::analyze_buffer`).
+///
+/// # Panics
+///
+/// Panics if `reports` is empty — a programming error: the zero-channel
+/// case synthesizes one silent channel, so callers always pass at least
+/// one report.
+pub(crate) fn aggregate(reports: &[SpectrumReport]) -> SpectrumReport {
+    let first = reports.first().expect("at least one channel report");
+    let mut scratch = Vec::with_capacity(reports.len());
+    let rolloff95_hz = crate::median_stat(&mut scratch, reports, |r| r.rolloff95_hz);
+    let band_energy_fraction = BandFractions {
+        b0_500: crate::median_stat(&mut scratch, reports, |r| r.band_energy_fraction.b0_500),
+        b500_2000: crate::median_stat(&mut scratch, reports, |r| r.band_energy_fraction.b500_2000),
+        b2000_8000: crate::median_stat(&mut scratch, reports, |r| {
+            r.band_energy_fraction.b2000_8000
+        }),
+        b8000_nyquist: crate::median_stat(&mut scratch, reports, |r| {
+            r.band_energy_fraction.b8000_nyquist
+        }),
+    };
+    // Same sample rate -> the same band set in every channel, so every
+    // per-channel vector matches the first report in length.
+    let bands24_energy_fraction = (0..first.bands24_energy_fraction.len())
+        .map(|b| crate::median_stat(&mut scratch, reports, |r| r.bands24_energy_fraction[b]))
+        .collect();
+    SpectrumReport {
+        // A sample-rate constant: identical in every channel.
+        bin_hz: first.bin_hz,
+        rolloff95_hz,
+        band_energy_fraction,
+        bands24_energy_fraction,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

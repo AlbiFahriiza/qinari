@@ -1,0 +1,2759 @@
+{
+ "provenance": {
+  "channels": 2,
+  "code_hash": "f06971a88d6abe55caec57cdeb17e98d1c2d05ff",
+  "date_utc": "2026-11-08",
+  "determinism": "verified: two full captures byte-identical",
+  "duration_secs": {
+   "ambient": 6.0,
+   "sfx": 4.0
+  },
+  "machine": {
+   "cores": 2,
+   "uname": "Linux 5.10.134-013.15.kangaroo.al8.x86_64"
+  },
+  "output": "default chain (24-bit WAV, mastering on: -16 LUFS, -1.0 dBFS ceiling, transparent)",
+  "qinari_version": "qinari 0.1.5",
+  "sample_rate_hz": 44100,
+  "seeds": [
+   "realism-bench",
+   "baseline-0.1.5"
+  ],
+  "tools": {
+   "python": "3.12.16"
+  }
+ },
+ "renders": [
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.983276815238222,
+    "peak_dbfs": -7.013535499572754,
+    "realism": {
+     "event_count": 3,
+     "event_interval_cv": 0.8442748635520583,
+     "event_rate_hz": 0.7533482142857143,
+     "gain_line_share": 0.13533863981523275,
+     "gain_peak_hz": 0.7533482142857144,
+     "gain_peak_mean_ratio": 44.62917797697618,
+     "interaural": {
+      "b0_500": 0.754954496748907,
+      "b2000_8000": 0.02399627124614812,
+      "b500_2000": 0.3049263589202974,
+      "b8000_nyquist": -0.0024000505091662508
+     }
+    },
+    "rms_dbfs": -21.212364196777344,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "rain",
+   "seed": "realism-bench",
+   "sha256": "de2f681c8adf963fb918df11e355d52b6c34dae5e56dbe274792055af23a12a2",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.98135625998477,
+    "peak_dbfs": -5.162394046783447,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.11314966140279155,
+     "gain_peak_hz": 2.5111607142857144,
+     "gain_peak_mean_ratio": 31.676254289372956,
+     "interaural": {
+      "b0_500": 0.7634812704632566,
+      "b2000_8000": 0.03538874641652134,
+      "b500_2000": 0.3124375458604424,
+      "b8000_nyquist": 0.006791811773116863
+     }
+    },
+    "rms_dbfs": -21.202816009521484,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "rain",
+   "seed": "baseline-0.1.5",
+   "sha256": "50c83a399a5b5bb793f7917482735680ebfb19b464137403e0cfe099855fd854",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.15378985968022,
+    "peak_dbfs": -6.043195724487305,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.18027265897981437,
+     "gain_peak_hz": 0.5022321428571429,
+     "gain_peak_mean_ratio": 43.01570029267701,
+     "interaural": {
+      "b0_500": 0.9827114713961809,
+      "b2000_8000": 0.0031028725054530063,
+      "b500_2000": 0.4455181555911268,
+      "b8000_nyquist": -0.003110601526414574
+     }
+    },
+    "rms_dbfs": -19.479204177856445,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "wind",
+   "seed": "realism-bench",
+   "sha256": "29acdc17bdf26be4f9f1797c0bdc4e760f73c3668e49d8ee66154cbdbbfe7a2a",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.158802280828017,
+    "peak_dbfs": -6.046931743621826,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.1402335225291569,
+     "gain_peak_hz": 0.7533482142857144,
+     "gain_peak_mean_ratio": 39.90337180368319,
+     "interaural": {
+      "b0_500": 0.9840152699778744,
+      "b2000_8000": 0.01823875363107685,
+      "b500_2000": 0.46412895709487145,
+      "b8000_nyquist": 0.0002974301371655485
+     }
+    },
+    "rms_dbfs": -19.46893882751465,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "wind",
+   "seed": "baseline-0.1.5",
+   "sha256": "c73c0b985d159a47d81582bf5111bce2aaafde1f3fd9bda7271635ad8c9a69c5",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.037796342021156,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.37607604800464506,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 128.0819574386191,
+     "interaural": {
+      "b0_500": 0.994987856675517,
+      "b2000_8000": 0.9991162593363381,
+      "b500_2000": 0.9957214967356328,
+      "b8000_nyquist": 0.9985540324309892
+     }
+    },
+    "rms_dbfs": -18.06783103942871,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972973,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.007556675062972292
+    }
+   },
+   "recipe": "thunder",
+   "seed": "realism-bench",
+   "sha256": "3fdbb33cd6df0021aa4f220a78a24a20ba569dd24ac28a0144eae6b8b1087f85",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.225165083603084,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.30613256019635854,
+     "gain_peak_hz": 0.5022321428571429,
+     "gain_peak_mean_ratio": 104.26834104623575,
+     "interaural": {
+      "b0_500": 0.9946817888885859,
+      "b2000_8000": 0.9981982296553493,
+      "b500_2000": 0.9926563488794232,
+      "b8000_nyquist": 0.9989031381681597
+     }
+    },
+    "rms_dbfs": -17.377126693725586,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972974,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0327455919395466
+    }
+   },
+   "recipe": "thunder",
+   "seed": "baseline-0.1.5",
+   "sha256": "5aa9fe272961443a829934bfda6d6d994afccf12c6e5e90ebff7f2b554d9b744",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.249599950536687,
+    "peak_dbfs": -4.706593990325928,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.1638723588681928,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 47.36309248673339,
+     "interaural": {
+      "b0_500": 0.9999999999999928,
+      "b2000_8000": 0.9999999999969208,
+      "b500_2000": 0.9999999999999285,
+      "b8000_nyquist": 0.9999999999965682
+     }
+    },
+    "rms_dbfs": -18.28087043762207,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ocean",
+   "seed": "realism-bench",
+   "sha256": "d1af2f8cd3e1ce89562a72f316796abefb3674a073d9c59398485d159153c07d",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.25978452842915,
+    "peak_dbfs": -4.863476276397705,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.15886272117149972,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 34.09688802041069,
+     "interaural": {
+      "b0_500": 0.999999999999993,
+      "b2000_8000": 0.9999999999968919,
+      "b500_2000": 0.9999999999999309,
+      "b8000_nyquist": 0.9999999999966042
+     }
+    },
+    "rms_dbfs": -18.275949478149414,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ocean",
+   "seed": "baseline-0.1.5",
+   "sha256": "a689c15f7fd79f5c1a69f531363adef60a65fda983729568fb19135990c78d0b",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.236375029602048,
+    "peak_dbfs": -0.9999985098838806,
+    "realism": {
+     "event_count": 31,
+     "event_interval_cv": 0.4187352711437878,
+     "event_rate_hz": 7.784598214285714,
+     "gain_line_share": 0.21160800215862433,
+     "gain_peak_hz": 1.0044642857142858,
+     "gain_peak_mean_ratio": 68.99157621346555,
+     "interaural": {
+      "b0_500": 0.9082423657346489,
+      "b2000_8000": 0.015366450686491185,
+      "b500_2000": 0.3145189401765633,
+      "b8000_nyquist": -0.004384227508102561
+     }
+    },
+    "rms_dbfs": -20.638141632080078,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "fire",
+   "seed": "realism-bench",
+   "sha256": "d88c1d1d8538b7a1626288ca8ec884e9559a2bdaa70508dcdeab6d9bfa336fc8",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.180846020142816,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 32,
+     "event_interval_cv": 0.4294592666458472,
+     "event_rate_hz": 8.035714285714286,
+     "gain_line_share": 0.2061006586574546,
+     "gain_peak_hz": 1.2555803571428572,
+     "gain_peak_mean_ratio": 49.62541894036007,
+     "interaural": {
+      "b0_500": 0.891109397023026,
+      "b2000_8000": 0.036698084431827954,
+      "b500_2000": 0.2805124384530054,
+      "b8000_nyquist": -7.425571504723942e-05
+     }
+    },
+    "rms_dbfs": -20.772600173950195,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "fire",
+   "seed": "baseline-0.1.5",
+   "sha256": "8c893ce52fd4c64f2683a42064d662a48909abcd0cc10f41272141628d1b7864",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.991159992329727,
+    "peak_dbfs": -8.177054405212402,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.17134725786162971,
+     "gain_peak_hz": 1.5066964285714288,
+     "gain_peak_mean_ratio": 30.34798158534226,
+     "interaural": {
+      "b0_500": 0.752063779744041,
+      "b2000_8000": 0.01112206921749596,
+      "b500_2000": 0.4198152381788557,
+      "b8000_nyquist": 0.003985568665958771
+     }
+    },
+    "rms_dbfs": -21.127225875854492,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "stream",
+   "seed": "realism-bench",
+   "sha256": "05d59edda9846f0058b07a87a54212ebffeab2a7c6d234d9178112d528024fc5",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.993202632033011,
+    "peak_dbfs": -8.340886116027832,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.1590823899785327,
+     "gain_peak_hz": 0.7533482142857144,
+     "gain_peak_mean_ratio": 36.18417244646955,
+     "interaural": {
+      "b0_500": 0.7633050822520082,
+      "b2000_8000": 0.011237170569900883,
+      "b500_2000": 0.41314182682909834,
+      "b8000_nyquist": 0.003394130961369351
+     }
+    },
+    "rms_dbfs": -21.095928192138672,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "stream",
+   "seed": "baseline-0.1.5",
+   "sha256": "f9460bc7b74bfd934383c29a2ace510d206e71c06ceac88194e17cd89d3ace59",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.097318055788115,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 12,
+     "event_interval_cv": 0.9524409477736586,
+     "event_rate_hz": 3.013392857142857,
+     "gain_line_share": 0.497025842425375,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 169.45063501112824,
+     "interaural": {
+      "b0_500": 0.9999357150039527,
+      "b2000_8000": 0.9315321789015175,
+      "b500_2000": 0.9336146573185141,
+      "b8000_nyquist": 0.9495762643163012
+     }
+    },
+    "rms_dbfs": -17.602399826049805,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 277.8422774541893,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 14.551861733620019,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.15113350125944586
+    }
+   },
+   "recipe": "explosion",
+   "seed": "realism-bench",
+   "sha256": "19e4a606010f450b9506aacaf3c274d90012a1ec6f4afd1fc3c9c4865faa3056",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.28880560935095,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 25,
+     "event_interval_cv": 0.4233210310892192,
+     "event_rate_hz": 6.277901785714286,
+     "gain_line_share": 0.5176833273021034,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 176.52091729324195,
+     "interaural": {
+      "b0_500": 0.9998649628642534,
+      "b2000_8000": 0.8899360400803233,
+      "b500_2000": 0.8875177393674158,
+      "b8000_nyquist": 0.9244874397276363
+     }
+    },
+    "rms_dbfs": -17.05325698852539,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 270.71656415057953,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 14.860336486947563,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.1561712846347607
+    }
+   },
+   "recipe": "explosion",
+   "seed": "baseline-0.1.5",
+   "sha256": "5d22ff471fecd76ba0729169a8eee7ad56527ebaedd912e0b415f34e1f4a3ec6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -17.025753469186316,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 3,
+     "event_interval_cv": 0.353553390593274,
+     "event_rate_hz": 0.7533482142857143,
+     "gain_line_share": 0.2641631862271393,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 89.870308300345,
+     "interaural": {
+      "b0_500": 0.9996100748928588,
+      "b2000_8000": 0.997130625120519,
+      "b500_2000": 0.9962575654239567,
+      "b8000_nyquist": 0.9954906112456109
+     }
+    },
+    "rms_dbfs": -24.588298797607422,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 295.3224671213318,
+     "f0_range_st": 26.43316337505018,
+     "f0_sigma_st": 12.370045482701597,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.04534005037783375
+    }
+   },
+   "recipe": "impact",
+   "seed": "realism-bench",
+   "sha256": "0459f23bf1a942f70bcfad5c4d2d70143dafc252980bc4d526b2ff140cbb5bfa",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -17.58996456392559,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 3,
+     "event_interval_cv": 0.10878565864408403,
+     "event_rate_hz": 0.7533482142857143,
+     "gain_line_share": 0.2615293493556443,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 88.97424033765358,
+     "interaural": {
+      "b0_500": 0.9997455309418564,
+      "b2000_8000": 0.9966965545967563,
+      "b500_2000": 0.9961008847506655,
+      "b8000_nyquist": 0.9953563220982734
+     }
+    },
+    "rms_dbfs": -24.974750518798828,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 289.3524514874463,
+     "f0_range_st": 26.36527175670707,
+     "f0_sigma_st": 12.552986235019166,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.042821158690176324
+    }
+   },
+   "recipe": "impact",
+   "seed": "baseline-0.1.5",
+   "sha256": "9bea3395d560799be07f7c7c57519030b89e011f00be65d5a5bac73915439226",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.915107667993645,
+    "peak_dbfs": -3.6119320392608643,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.5437840949263729,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 185.03563038540653,
+     "interaural": {
+      "b0_500": 0.9337845687856985,
+      "b2000_8000": 0.9438838825495034,
+      "b500_2000": 0.9365954006503688,
+      "b8000_nyquist": 0.926866472750443
+     }
+    },
+    "rms_dbfs": -28.451229095458984,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "whoosh",
+   "seed": "realism-bench",
+   "sha256": "afce73a9ff56027c2902d59f3f86a938d70003d934b2637c957d611e71676b53",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.931497556599028,
+    "peak_dbfs": -2.9216718673706055,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.5299251669264136,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 180.44493297785516,
+     "interaural": {
+      "b0_500": 0.9209843138638982,
+      "b2000_8000": 0.9429127837170571,
+      "b500_2000": 0.9251660157594018,
+      "b8000_nyquist": 0.9216433297405863
+     }
+    },
+    "rms_dbfs": -28.417509078979492,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "whoosh",
+   "seed": "baseline-0.1.5",
+   "sha256": "137bd89f8ac920773806a49b4296624bf09177dfb0b22515beaaba7ec4e8a7a6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.929882451610075,
+    "peak_dbfs": -6.148433208465576,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.1819756909049699,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 60.141891327723435,
+     "interaural": {
+      "b0_500": 0.9521575909424446,
+      "b2000_8000": 0.9647408013875929,
+      "b500_2000": 0.9657684832133774,
+      "b8000_nyquist": 0.9545229273415315
+     }
+    },
+    "rms_dbfs": -30.698497772216797,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972973,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.005037783375314861
+    }
+   },
+   "recipe": "sword",
+   "seed": "realism-bench",
+   "sha256": "efeacd9af7e6876967db5614e0c5bc1d566b89b8941dea4b34ea6b821198ab69",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.933869327285349,
+    "peak_dbfs": -5.501641750335693,
+    "realism": {
+     "event_count": 3,
+     "event_interval_cv": 0.1285648693066448,
+     "event_rate_hz": 0.7533482142857143,
+     "gain_line_share": 0.18197549848728567,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 60.170584903903126,
+     "interaural": {
+      "b0_500": 0.963449436577729,
+      "b2000_8000": 0.9642554642406971,
+      "b500_2000": 0.9632819660737136,
+      "b8000_nyquist": 0.9518392663879248
+     }
+    },
+    "rms_dbfs": -30.713336944580078,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972973,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.005037783375314861
+    }
+   },
+   "recipe": "sword",
+   "seed": "baseline-0.1.5",
+   "sha256": "cafbac22c0dd6732403f8d03243d9e1cd13088ceb15a27d27868c56d0e0e9696",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.978938839411777,
+    "peak_dbfs": -5.404536724090576,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.19092216969146036,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 64.57631051015072,
+     "interaural": {
+      "b0_500": 0.9999294705203512,
+      "b2000_8000": 0.9998601802062186,
+      "b500_2000": 0.999907575211983,
+      "b8000_nyquist": 0.9999479980185715
+     }
+    },
+    "rms_dbfs": -32.00893783569336,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 147.98657718120805,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0025188916876574307
+    }
+   },
+   "recipe": "laser",
+   "seed": "realism-bench",
+   "sha256": "0ddc805f79739d0dea1f0e011b0a080b03425c235ba3156e10a35ec1c9d44c0b",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.978925572233278,
+    "peak_dbfs": -5.112665176391602,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.19092189358555908,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 64.5760020217679,
+     "interaural": {
+      "b0_500": 0.9999578714968751,
+      "b2000_8000": 0.9998630604164841,
+      "b500_2000": 0.9999099141792216,
+      "b8000_nyquist": 0.9999475507394089
+     }
+    },
+    "rms_dbfs": -32.00741958618164,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 147.98657718120805,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0025188916876574307
+    }
+   },
+   "recipe": "laser",
+   "seed": "baseline-0.1.5",
+   "sha256": "94009cb9e0469647bb4b1c8efd5009b498f36b1bda45b4087ff7bc2117e3243e",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.3073632350012,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.16702425442102992,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 35.383911062570256,
+     "interaural": {
+      "b0_500": 0.9991979482735772,
+      "b2000_8000": 0.9980225779842842,
+      "b500_2000": 0.9992519234420553,
+      "b8000_nyquist": 0.9997782025335019
+     }
+    },
+    "rms_dbfs": -29.629457473754883,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972973,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.005037783375314861
+    }
+   },
+   "recipe": "blaster",
+   "seed": "realism-bench",
+   "sha256": "8abf29ce16e53c6ebdc15714fd40dd98dedd2a56a2fdce9b0c316c5ff3d23e76",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.716890344507526,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.16232247690818688,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 33.717610387249785,
+     "interaural": {
+      "b0_500": 0.9991010153402708,
+      "b2000_8000": 0.9979214824921877,
+      "b500_2000": 0.999161509196814,
+      "b8000_nyquist": 0.9998107853117446
+     }
+    },
+    "rms_dbfs": -29.920337677001953,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.2972972972973,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0025188916876574307
+    }
+   },
+   "recipe": "blaster",
+   "seed": "baseline-0.1.5",
+   "sha256": "c40b62217a7845f979cc70a681f4e68647cb32687cb9cdc485093bfe712a1a14",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.020770937260842,
+    "peak_dbfs": -3.7618792057037354,
+    "realism": {
+     "event_count": 12,
+     "event_interval_cv": 0.6109667491041936,
+     "event_rate_hz": 3.013392857142857,
+     "gain_line_share": 0.7894639096225831,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 269.98115015608926,
+     "interaural": {
+      "b0_500": 0.9987008481912322,
+      "b2000_8000": 0.9550111618634992,
+      "b500_2000": 0.9848901347596863,
+      "b8000_nyquist": 0.984591068386136
+     }
+    },
+    "rms_dbfs": -27.573251724243164,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 140.21481365785718,
+     "f0_range_st": 5.957109913433984,
+     "f0_sigma_st": 2.408565802175275,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.03526448362720403
+    }
+   },
+   "recipe": "teleport",
+   "seed": "realism-bench",
+   "sha256": "39b7418b9e94816bebf01cb70c92b4aa1239ee5205da84910cda991e5eba46e9",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.033032209367725,
+    "peak_dbfs": -2.8933346271514893,
+    "realism": {
+     "event_count": 13,
+     "event_interval_cv": 0.5944104638906611,
+     "event_rate_hz": 3.264508928571429,
+     "gain_line_share": 0.7847785278314013,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 268.4704302635688,
+     "interaural": {
+      "b0_500": 0.999591755169682,
+      "b2000_8000": 0.9733138775085026,
+      "b500_2000": 0.9880890140842916,
+      "b8000_nyquist": 0.985761269775176
+     }
+    },
+    "rms_dbfs": -27.51485824584961,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 139.93832502417507,
+     "f0_range_st": 5.485738713368259,
+     "f0_sigma_st": 2.1804643854939223,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.03526448362720403
+    }
+   },
+   "recipe": "teleport",
+   "seed": "baseline-0.1.5",
+   "sha256": "7f16952857dd3438da14a8476a2922a29258ddb53df9324602a7a92a21ea9b51",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.00002813932881,
+    "peak_dbfs": -5.146577835083008,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.22185910429455202,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 68.07516534455847,
+     "interaural": {
+      "b0_500": 0.9999999999999937,
+      "b2000_8000": 0.9999999999977645,
+      "b500_2000": 0.9999999999994008,
+      "b8000_nyquist": 0.9999999999981285
+     }
+    },
+    "rms_dbfs": -17.587993621826172,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 67.54835341063756,
+     "f0_range_st": 11.015689136850419,
+     "f0_sigma_st": 3.776308750356556,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.17884130982367757
+    }
+   },
+   "recipe": "forcefield",
+   "seed": "realism-bench",
+   "sha256": "2d029a74659df26d70d42377e3fe74b0cad3e1afe91d35e2bf384dae97b71078",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.999988264708625,
+    "peak_dbfs": -5.290831565856934,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.23156817714153127,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 70.23772910680111,
+     "interaural": {
+      "b0_500": 0.999999999999995,
+      "b2000_8000": 0.9999999999978285,
+      "b500_2000": 0.9999999999994121,
+      "b8000_nyquist": 0.9999999999981697
+     }
+    },
+    "rms_dbfs": -17.62511444091797,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 66.22587032643551,
+     "f0_range_st": 11.015689136850419,
+     "f0_sigma_st": 3.4881233774477867,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.17380352644836272
+    }
+   },
+   "recipe": "forcefield",
+   "seed": "baseline-0.1.5",
+   "sha256": "3ae86af5ab940010939953351ba85b41d8499f28719eb8c3aacb08adca12e43a",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.122167833623738,
+    "peak_dbfs": -6.5825395584106445,
+    "realism": {
+     "event_count": 11,
+     "event_interval_cv": 0.3960532930913628,
+     "event_rate_hz": 2.7622767857142856,
+     "gain_line_share": 0.33957682736799455,
+     "gain_peak_hz": 1.2555803571428572,
+     "gain_peak_mean_ratio": 68.37029673509156,
+     "interaural": {
+      "b0_500": 0.9624949444893869,
+      "b2000_8000": 0.9395823571146585,
+      "b500_2000": 0.9407527432342415,
+      "b8000_nyquist": 0.9361338028625561
+     }
+    },
+    "rms_dbfs": -19.009445190429688,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 314.3383396126901,
+     "f0_range_st": 12.597036422365198,
+     "f0_sigma_st": 3.6155632280651924,
+     "pause_count": 3,
+     "pause_rate_per_min": 45.0,
+     "pause_total_s": 1.1400000000000001,
+     "voiced_fraction": 0.5994962216624685
+    }
+   },
+   "recipe": "robot_talk",
+   "seed": "realism-bench",
+   "sha256": "4cb7454e84928b4163836d9baf7e814b61147883fa0e4b03a8e17433527f1635",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.06746329294513,
+    "peak_dbfs": -6.796135425567627,
+    "realism": {
+     "event_count": 11,
+     "event_interval_cv": 0.4129747790772396,
+     "event_rate_hz": 2.7622767857142856,
+     "gain_line_share": 0.19016027652904416,
+     "gain_peak_hz": 1.5066964285714288,
+     "gain_peak_mean_ratio": 59.936963100958884,
+     "interaural": {
+      "b0_500": 0.9824084150191857,
+      "b2000_8000": 0.9028421846876855,
+      "b500_2000": 0.9066872373688328,
+      "b8000_nyquist": 0.8983941048415158
+     }
+    },
+    "rms_dbfs": -19.212953567504883,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 322.64770867798956,
+     "f0_range_st": 7.174818677143852,
+     "f0_sigma_st": 1.9521746862987164,
+     "pause_count": 3,
+     "pause_rate_per_min": 45.0,
+     "pause_total_s": 1.15,
+     "voiced_fraction": 0.5843828715365239
+    }
+   },
+   "recipe": "robot_talk",
+   "seed": "baseline-0.1.5",
+   "sha256": "9015b498fe13423fc46937b1d518275b0d97ade3608b84bbbd88ee52f17ed3d1",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.187580910083042,
+    "peak_dbfs": -2.686215877532959,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.2621604480506093,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 88.94594483879948,
+     "interaural": {
+      "b0_500": 0.9999999998813507,
+      "b2000_8000": 0.9999999997625575,
+      "b500_2000": 0.9999999999998652,
+      "b8000_nyquist": 0.9999999968740093
+     }
+    },
+    "rms_dbfs": -27.03791618347168,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 324.08955223880577,
+     "f0_range_st": 1.9527540004572999,
+     "f0_sigma_st": 0.6904027978562634,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.12342569269521411
+    }
+   },
+   "recipe": "ui_success",
+   "seed": "realism-bench",
+   "sha256": "a3c19f1268489edcbe741fab234cf6424d5c4bd77450fca5099813a0912b05a3",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.190926282916394,
+    "peak_dbfs": -2.6085619926452637,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.2635228460454847,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 89.44872494139102,
+     "interaural": {
+      "b0_500": 0.9999999999674463,
+      "b2000_8000": 0.9999999990552214,
+      "b500_2000": 0.999999999999867,
+      "b8000_nyquist": 0.999999839767365
+     }
+    },
+    "rms_dbfs": -27.02054786682129,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 324.08955223880577,
+     "f0_range_st": 1.9527540004572999,
+     "f0_sigma_st": 0.6904027978562634,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.12342569269521411
+    }
+   },
+   "recipe": "ui_success",
+   "seed": "baseline-0.1.5",
+   "sha256": "c6ad02f0aa607b3f65b86c086e7d89015a82e14b9a849c2e760b28d2717eb976",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.00367232707373,
+    "peak_dbfs": -4.869004726409912,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.2160996047679914,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 73.50719675837664,
+     "interaural": {
+      "b0_500": 0.9999999999999923,
+      "b2000_8000": 0.9999999997466635,
+      "b500_2000": 0.9999999999993341,
+      "b8000_nyquist": 0.999998133131462
+     }
+    },
+    "rms_dbfs": -25.441816329956055,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 147.13987583012968,
+     "f0_range_st": 0.1158020404046296,
+     "f0_sigma_st": 0.03770402263061738,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.09319899244332494
+    }
+   },
+   "recipe": "ui_error",
+   "seed": "realism-bench",
+   "sha256": "71822a2bae92c1d91538a91541ac4a45153545585c6998caa877cbf27818cf80",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.046498803348094,
+    "peak_dbfs": -6.406213760375977,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.21638407681481422,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 73.60670118759477,
+     "interaural": {
+      "b0_500": 0.9999999999999919,
+      "b2000_8000": 0.9999999996001123,
+      "b500_2000": 0.9999999999993541,
+      "b8000_nyquist": 0.9999982609957232
+     }
+    },
+    "rms_dbfs": -25.904006958007812,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 147.07308144264667,
+     "f0_range_st": 0.057804195573310097,
+     "f0_sigma_st": 0.020283530489241627,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.09319899244332494
+    }
+   },
+   "recipe": "ui_error",
+   "seed": "baseline-0.1.5",
+   "sha256": "17636efb2831e3dc85bad89db564a6d2ab8877d3ec369c24eca691a4126f960b",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -20.996046121798095,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.07355905649005415,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 11.984360589002065,
+     "interaural": {
+      "b0_500": 0.9999999999944849,
+      "b2000_8000": 0.9999999999859563,
+      "b500_2000": 0.9999999999939526,
+      "b8000_nyquist": 0.9999999995537125
+     }
+    },
+    "rms_dbfs": -36.092533111572266,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ui_click",
+   "seed": "realism-bench",
+   "sha256": "1ead5fad20793a5b41aeba3e292bad1853f32cc1b3d88befbf8d92fcb2af2232",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -20.945613995962997,
+    "peak_dbfs": -0.9999985098838806,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.07103363424479127,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 11.511777117612061,
+     "interaural": {
+      "b0_500": 0.9999999999910657,
+      "b2000_8000": 0.9999999999877575,
+      "b500_2000": 0.9999999999914685,
+      "b8000_nyquist": 0.9999999996506698
+     }
+    },
+    "rms_dbfs": -36.31554412841797,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ui_click",
+   "seed": "baseline-0.1.5",
+   "sha256": "44a5253d5cfdf2707f9f06342e0166b436df5cca4cd0338a35553fbe46dccbb8",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.2072614488283,
+    "peak_dbfs": -0.9999985098838806,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.8109272772832151,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 276.9191209504596,
+     "interaural": {
+      "b0_500": 0.9999708873258213,
+      "b2000_8000": 0.9954685552951045,
+      "b500_2000": 0.9979079144154707,
+      "b8000_nyquist": 0.9979862547744551
+     }
+    },
+    "rms_dbfs": -21.424354553222656,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 373.5369563543617,
+     "f0_range_st": 12.0,
+     "f0_sigma_st": 2.511799139585889,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.4811083123425693
+    }
+   },
+   "recipe": "sonar",
+   "seed": "realism-bench",
+   "sha256": "9f81a9f02da54e82c72c4edda89c02e4c4b3031cc27b1599b07df16eef89e72a",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.153335068751378,
+    "peak_dbfs": -1.2061843872070312,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.8141657597563807,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 278.0555499565378,
+     "interaural": {
+      "b0_500": 0.9999694453597353,
+      "b2000_8000": 0.9976992900367269,
+      "b500_2000": 0.998109385620446,
+      "b8000_nyquist": 0.9995749062208873
+     }
+    },
+    "rms_dbfs": -21.555877685546875,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 373.23042340086613,
+     "f0_range_st": 12.0,
+     "f0_sigma_st": 2.5631076812884093,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.4811083123425693
+    }
+   },
+   "recipe": "sonar",
+   "seed": "baseline-0.1.5",
+   "sha256": "4a76fbeaf70bc8082628003b4259abb3be3ba3392723d937d68a7f8dd8fd6b40",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.98824560104095,
+    "peak_dbfs": -15.890012741088867,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.10462845198367239,
+     "gain_peak_hz": 0.5022321428571429,
+     "gain_peak_mean_ratio": 20.980401345721567,
+     "interaural": {
+      "b0_500": 0.9999999999994272,
+      "b2000_8000": 0.999999999994465,
+      "b500_2000": 0.9999999999999826,
+      "b8000_nyquist": 0.9999999918131198
+     }
+    },
+    "rms_dbfs": -18.68524169921875,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 315.12250881342874,
+     "f0_range_st": 7.277562839184941,
+     "f0_sigma_st": 2.010665825484757,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 1.0
+    }
+   },
+   "recipe": "alarm",
+   "seed": "realism-bench",
+   "sha256": "481b432dc7a5f497ac65df7e21c0d0a23677b8733d6979c1736db932e5110ab6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.98824560104095,
+    "peak_dbfs": -15.890012741088867,
+    "realism": {
+     "event_count": 1,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.25111607142857145,
+     "gain_line_share": 0.10462845198367239,
+     "gain_peak_hz": 0.5022321428571429,
+     "gain_peak_mean_ratio": 20.980401345721567,
+     "interaural": {
+      "b0_500": 0.9999999999994272,
+      "b2000_8000": 0.999999999994465,
+      "b500_2000": 0.9999999999999826,
+      "b8000_nyquist": 0.9999999918131198
+     }
+    },
+    "rms_dbfs": -18.68524169921875,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 315.12250881342874,
+     "f0_range_st": 7.277562839184941,
+     "f0_sigma_st": 2.010665825484757,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 1.0
+    }
+   },
+   "recipe": "alarm",
+   "seed": "baseline-0.1.5",
+   "sha256": "481b432dc7a5f497ac65df7e21c0d0a23677b8733d6979c1736db932e5110ab6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.000003050907296,
+    "peak_dbfs": -7.946084976196289,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.13940201309756614,
+     "gain_peak_hz": 39.92745535714286,
+     "gain_peak_mean_ratio": 39.58894252072815,
+     "interaural": {
+      "b0_500": 0.9999999999999944,
+      "b2000_8000": 0.9999999993166454,
+      "b500_2000": 0.9999999999995807,
+      "b8000_nyquist": 0.9999969504250432
+     }
+    },
+    "rms_dbfs": -17.001150131225586,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 80.44177733904459,
+     "f0_range_st": 0.3777387776780149,
+     "f0_sigma_st": 0.08324081562824087,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.29974811083123426
+    }
+   },
+   "recipe": "engine",
+   "seed": "realism-bench",
+   "sha256": "6fddd3078d564ccc3dd8ab310b7e96848afdc1c537bd2e5bebf04b7dfb8530a6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.999972901944995,
+    "peak_dbfs": -8.980290412902832,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.13354602942029956,
+     "gain_peak_hz": 39.92745535714286,
+     "gain_peak_mean_ratio": 55.830060494203,
+     "interaural": {
+      "b0_500": 0.9999999999999976,
+      "b2000_8000": 0.9999999994929326,
+      "b500_2000": 0.9999999999996529,
+      "b8000_nyquist": 0.9999977940468198
+     }
+    },
+    "rms_dbfs": -16.536418914794922,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "engine",
+   "seed": "baseline-0.1.5",
+   "sha256": "39f50e93feafb73f013e14e573bb8c73f61e3f6f3c2d5c13878c36c295bb7fb3",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.985002806193537,
+    "peak_dbfs": -3.1941347122192383,
+    "realism": {
+     "event_count": 25,
+     "event_interval_cv": 0.5722936133305625,
+     "event_rate_hz": 6.277901785714286,
+     "gain_line_share": 0.12674345132134004,
+     "gain_peak_hz": 1.7578125000000002,
+     "gain_peak_mean_ratio": 34.17355877574581,
+     "interaural": {
+      "b0_500": 0.9042977351657314,
+      "b2000_8000": 0.887961946330897,
+      "b500_2000": 0.8889510538049117,
+      "b8000_nyquist": 0.9082086104865329
+     }
+    },
+    "rms_dbfs": -21.498462677001953,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 316.41400701897373,
+     "f0_range_st": 16.921863334789172,
+     "f0_sigma_st": 6.544563333787067,
+     "pause_count": 3,
+     "pause_rate_per_min": 45.0,
+     "pause_total_s": 0.63,
+     "voiced_fraction": 0.10075566750629723
+    }
+   },
+   "recipe": "glitch",
+   "seed": "realism-bench",
+   "sha256": "c958e69c83e7093adcf6451e44e106ed8a97c32a4db757b2f7a566134d467883",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.004505083508864,
+    "peak_dbfs": -1.2832266092300415,
+    "realism": {
+     "event_count": 27,
+     "event_interval_cv": 0.5410155576158453,
+     "event_rate_hz": 6.780133928571429,
+     "gain_line_share": 0.15176675435038356,
+     "gain_peak_hz": 3.264508928571429,
+     "gain_peak_mean_ratio": 50.388392861716675,
+     "interaural": {
+      "b0_500": 0.9172142910765095,
+      "b2000_8000": 0.9044512279313961,
+      "b500_2000": 0.9272566018057344,
+      "b8000_nyquist": 0.6012631367846424
+     }
+    },
+    "rms_dbfs": -20.621257781982422,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 334.39540559604853,
+     "f0_range_st": 10.365547396820265,
+     "f0_sigma_st": 3.8380381090603444,
+     "pause_count": 2,
+     "pause_rate_per_min": 30.0,
+     "pause_total_s": 0.39,
+     "voiced_fraction": 0.0982367758186398
+    }
+   },
+   "recipe": "glitch",
+   "seed": "baseline-0.1.5",
+   "sha256": "7161a7c0c049c6cadce804cd0a785d2d968ac97984d05e0f1d37fe5192bb6219",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.029586462855928,
+    "peak_dbfs": -4.507984638214111,
+    "realism": {
+     "event_count": 5,
+     "event_interval_cv": 0.29655767819414647,
+     "event_rate_hz": 1.2555803571428572,
+     "gain_line_share": 0.5129334204923595,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 175.45410817319365,
+     "interaural": {
+      "b0_500": 0.9994698264842595,
+      "b2000_8000": 0.9713090150244851,
+      "b500_2000": 0.9990561398402844,
+      "b8000_nyquist": 0.9966784045908516
+     }
+    },
+    "rms_dbfs": -21.058547973632812,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 250.12071087289138,
+     "f0_range_st": 20.843587129994475,
+     "f0_sigma_st": 5.409348158862069,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.8942065491183879
+    }
+   },
+   "recipe": "riser",
+   "seed": "realism-bench",
+   "sha256": "2492483c230487e1e0a6e59420408861b0fde906403de10f3ab8771a085464da",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.858161197823494,
+    "peak_dbfs": -4.190854072570801,
+    "realism": {
+     "event_count": 6,
+     "event_interval_cv": 0.44255407390050544,
+     "event_rate_hz": 1.5066964285714286,
+     "gain_line_share": 0.5121332774514527,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 175.1718225609686,
+     "interaural": {
+      "b0_500": 0.9994380126100265,
+      "b2000_8000": 0.9709120393956925,
+      "b500_2000": 0.9989330918360385,
+      "b8000_nyquist": 0.9967491801062835
+     }
+    },
+    "rms_dbfs": -20.893970489501953,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 249.28508311160482,
+     "f0_range_st": 20.843587129994475,
+     "f0_sigma_st": 5.400840621987876,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.9143576826196473
+    }
+   },
+   "recipe": "riser",
+   "seed": "baseline-0.1.5",
+   "sha256": "4449f58c114acada3f5ebcb51d3c9c4827dd1770fa243350fb666a7cb9b62870",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.722419983921206,
+    "peak_dbfs": -1.0000008344650269,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.18112411179071905,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 48.46825087532828,
+     "interaural": {
+      "b0_500": 0.9999999999999333,
+      "b2000_8000": 0.9999999999613722,
+      "b500_2000": 0.9999999999883822,
+      "b8000_nyquist": 0.9999999970296749
+     }
+    },
+    "rms_dbfs": -28.53588104248047,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 339.44266257258397,
+     "f0_range_st": 21.35077585371859,
+     "f0_sigma_st": 8.63573992457007,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.060453400503778336
+    }
+   },
+   "recipe": "hit",
+   "seed": "realism-bench",
+   "sha256": "ac6ca094292e9668ac131e48bdfbb1ab26672c19ea079268f37eb6e083c48eee",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -17.27934251337771,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.5022321428571429,
+     "gain_line_share": 0.18129856241989317,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 50.39977469646593,
+     "interaural": {
+      "b0_500": 0.9999999999999305,
+      "b2000_8000": 0.9999999999117098,
+      "b500_2000": 0.9999999999792261,
+      "b8000_nyquist": 0.9999999944077321
+     }
+    },
+    "rms_dbfs": -28.8973445892334,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 318.79542377389055,
+     "f0_range_st": 24.98521296257872,
+     "f0_sigma_st": 10.45834605651312,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0654911838790932
+    }
+   },
+   "recipe": "hit",
+   "seed": "baseline-0.1.5",
+   "sha256": "63e9cf7c89ce2fd7b2a19a87c6152846dbaf5f06be6ede27b0ab3b30b4b2fa22",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.222851765432146,
+    "peak_dbfs": -1.5802690982818604,
+    "realism": {
+     "event_count": 14,
+     "event_interval_cv": 0.15617827984354457,
+     "event_rate_hz": 3.515625,
+     "gain_line_share": 0.6615692098478412,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 225.66265508909387,
+     "interaural": {
+      "b0_500": 0.9999999999999973,
+      "b2000_8000": 0.9999999868678983,
+      "b500_2000": 0.9999999999278022,
+      "b8000_nyquist": 0.9999966051759798
+     }
+    },
+    "rms_dbfs": -22.089998245239258,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 327.7529524987588,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 12.669950160954777,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.3350125944584383
+    }
+   },
+   "recipe": "sub_drop",
+   "seed": "realism-bench",
+   "sha256": "bbaaebe72470a21250a07c3ec384f3660b2c126244c9ee290482c6bb90374a54",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.21846357074353,
+    "peak_dbfs": -2.8196911811828613,
+    "realism": {
+     "event_count": 14,
+     "event_interval_cv": 0.14213028641521716,
+     "event_rate_hz": 3.515625,
+     "gain_line_share": 0.6622830917209296,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 225.91560737242426,
+     "interaural": {
+      "b0_500": 0.9999999999999954,
+      "b2000_8000": 0.9999999970378559,
+      "b500_2000": 0.9999999999448786,
+      "b8000_nyquist": 0.9999999681389948
+     }
+    },
+    "rms_dbfs": -22.103347778320312,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 327.81896363098315,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 12.632820457012109,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.3350125944584383
+    }
+   },
+   "recipe": "sub_drop",
+   "seed": "baseline-0.1.5",
+   "sha256": "d3efa48eb562d029c141d6d04fcde2977e45d6ebbc888461a614ff7199a3cd0c",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -17.413915608329646,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 7,
+     "event_interval_cv": 0.29881786179497527,
+     "event_rate_hz": 1.7578125,
+     "gain_line_share": 0.4737125863336705,
+     "gain_peak_hz": 1.0044642857142858,
+     "gain_peak_mean_ratio": 157.47372634365271,
+     "interaural": {
+      "b0_500": 0.998719446820357,
+      "b2000_8000": 0.9981809599611542,
+      "b500_2000": 0.9989069671682684,
+      "b8000_nyquist": 0.9977452203391749
+     }
+    },
+    "rms_dbfs": -18.2318172454834,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 277.84390889458894,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 15.578126121010621,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.1385390428211587
+    }
+   },
+   "recipe": "heartbeat",
+   "seed": "realism-bench",
+   "sha256": "e3552ab4819cab72de238a9f14f119bd972e20340a09249f981af6dca20897d9",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -17.08900361040714,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 7,
+     "event_interval_cv": 0.3030250901509183,
+     "event_rate_hz": 1.7578125,
+     "gain_line_share": 0.4731381277280669,
+     "gain_peak_hz": 1.0044642857142858,
+     "gain_peak_mean_ratio": 157.20729890984958,
+     "interaural": {
+      "b0_500": 0.9987256378963343,
+      "b2000_8000": 0.9980636458928992,
+      "b500_2000": 0.9987413145208587,
+      "b8000_nyquist": 0.9977083075245126
+     }
+    },
+    "rms_dbfs": -18.13448715209961,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 282.7434978451688,
+     "f0_range_st": 32.726214880483454,
+     "f0_sigma_st": 15.218779400876084,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.12594458438287154
+    }
+   },
+   "recipe": "heartbeat",
+   "seed": "baseline-0.1.5",
+   "sha256": "ead03ab88d020f8c0fcb739c066359fec398e29bc984f3d04a3ffdd25fb9648d",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -20.66016292537553,
+    "peak_dbfs": -0.9999985098838806,
+    "realism": {
+     "event_count": 11,
+     "event_interval_cv": 0.6009939858835602,
+     "event_rate_hz": 2.7622767857142856,
+     "gain_line_share": 0.49692162463604816,
+     "gain_peak_hz": 1.7578125000000002,
+     "gain_peak_mean_ratio": 166.03175872459826,
+     "interaural": {
+      "b0_500": 0.9597669962978909,
+      "b2000_8000": 0.9581511177273557,
+      "b500_2000": 0.9551983604619806,
+      "b8000_nyquist": 0.9601623194700679
+     }
+    },
+    "rms_dbfs": -25.00812530517578,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 7,
+     "pause_rate_per_min": 105.0,
+     "pause_total_s": 3.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "footsteps",
+   "seed": "realism-bench",
+   "sha256": "430099e424d98bc3904a37cf6e9cd76d34c6f9918fff419b5d85a2856118481e",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -20.784880371295475,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 13,
+     "event_interval_cv": 0.7425027251438286,
+     "event_rate_hz": 3.264508928571429,
+     "gain_line_share": 0.46426814761632257,
+     "gain_peak_hz": 1.7578125000000002,
+     "gain_peak_mean_ratio": 155.14107391814863,
+     "interaural": {
+      "b0_500": 0.968709055991809,
+      "b2000_8000": 0.9672167591369976,
+      "b500_2000": 0.9651863416985038,
+      "b8000_nyquist": 0.9680629021038148
+     }
+    },
+    "rms_dbfs": -25.180618286132812,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 7,
+     "pause_rate_per_min": 105.0,
+     "pause_total_s": 3.02,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "footsteps",
+   "seed": "baseline-0.1.5",
+   "sha256": "d34d6e3ab9944241adf9b46fd4758e733f06a69e9fbe31ed443d4961f29fa61b",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.968067870201237,
+    "peak_dbfs": -5.07637882232666,
+    "realism": {
+     "event_count": 7,
+     "event_interval_cv": 0.4268497300473816,
+     "event_rate_hz": 1.7578125,
+     "gain_line_share": 0.6555798803808826,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 224.05154253103808,
+     "interaural": {
+      "b0_500": 0.9938211090811836,
+      "b2000_8000": 0.9560887197941524,
+      "b500_2000": 0.9874883762655686,
+      "b8000_nyquist": 0.9715329440088761
+     }
+    },
+    "rms_dbfs": -27.871931076049805,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 321.96768072709904,
+     "f0_range_st": 14.175957176574741,
+     "f0_sigma_st": 5.5178858857350095,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.1964735516372796
+    }
+   },
+   "recipe": "spell_cast",
+   "seed": "realism-bench",
+   "sha256": "40f016565a7bf8d684a945450d895d1c288f6abffb4f7aa112eae01b198debb6",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.958943246530959,
+    "peak_dbfs": -5.619688987731934,
+    "realism": {
+     "event_count": 7,
+     "event_interval_cv": 0.334322748787333,
+     "event_rate_hz": 1.7578125,
+     "gain_line_share": 0.6556943235989006,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 224.10324523230602,
+     "interaural": {
+      "b0_500": 0.9965812998786544,
+      "b2000_8000": 0.9636914668688552,
+      "b500_2000": 0.989211705517869,
+      "b8000_nyquist": 0.9729506151541648
+     }
+    },
+    "rms_dbfs": -27.93421745300293,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 316.8272351967541,
+     "f0_range_st": 14.175957176574741,
+     "f0_sigma_st": 5.768876732733161,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.1964735516372796
+    }
+   },
+   "recipe": "spell_cast",
+   "seed": "baseline-0.1.5",
+   "sha256": "95da223cf88724c5c8f5b9fcbedb6dd6ae9c5b5fa4361c7e7a2837119d28b8c2",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.088077716925376,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 16,
+     "event_interval_cv": 1.983659881594986,
+     "event_rate_hz": 4.017857142857143,
+     "gain_line_share": 0.2396596865812137,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 80.71257363670723,
+     "interaural": {
+      "b0_500": 0.8395114615962966,
+      "b2000_8000": 0.8721913362007871,
+      "b500_2000": 0.8383294688745959,
+      "b8000_nyquist": 0.8990292219229226
+     }
+    },
+    "rms_dbfs": -25.07526206970215,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 388.8138216300632,
+     "f0_range_st": 1.2048227634940532,
+     "f0_sigma_st": 0.349801062523092,
+     "pause_count": 4,
+     "pause_rate_per_min": 60.0,
+     "pause_total_s": 2.9699999999999998,
+     "voiced_fraction": 0.07556675062972293
+    }
+   },
+   "recipe": "crickets",
+   "seed": "realism-bench",
+   "sha256": "da6f64180fc971507619b5d00149dfc12a62dd53f68f0a6e494e27eef59c8b7a",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -16.316681084911632,
+    "peak_dbfs": -0.9999985098838806,
+    "realism": {
+     "event_count": 10,
+     "event_interval_cv": 1.8831926718192504,
+     "event_rate_hz": 2.5111607142857144,
+     "gain_line_share": 0.12332637523645604,
+     "gain_peak_hz": 0.25111607142857145,
+     "gain_peak_mean_ratio": 40.06403046882189,
+     "interaural": {
+      "b0_500": 0.8597253468109668,
+      "b2000_8000": 0.8618674661688834,
+      "b500_2000": 0.8604436665226993,
+      "b8000_nyquist": 0.8597892370286704
+     }
+    },
+    "rms_dbfs": -26.18417739868164,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 377.22523219814263,
+     "f0_range_st": 1.0495540950040727,
+     "f0_sigma_st": 0.4169419130751126,
+     "pause_count": 3,
+     "pause_rate_per_min": 45.0,
+     "pause_total_s": 2.7800000000000002,
+     "voiced_fraction": 0.0906801007556675
+    }
+   },
+   "recipe": "crickets",
+   "seed": "baseline-0.1.5",
+   "sha256": "d7267479a8d218863d6f6cefa774df7869c2577b8f1e0ac6928ddb7b4b62fb8e",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.97595565771353,
+    "peak_dbfs": -7.508531093597412,
+    "realism": {
+     "event_count": 23,
+     "event_interval_cv": 0.8206913807959206,
+     "event_rate_hz": 5.775669642857143,
+     "gain_line_share": 0.24276179031086487,
+     "gain_peak_hz": 1.2555803571428572,
+     "gain_peak_mean_ratio": 67.54236333357342,
+     "interaural": {
+      "b0_500": 0.9785214203738433,
+      "b2000_8000": 0.9824839013965738,
+      "b500_2000": 0.9790165618013122,
+      "b8000_nyquist": 0.9818697102428999
+     }
+    },
+    "rms_dbfs": -22.632577896118164,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 387.7454539948488,
+     "f0_range_st": 0.7627815453295936,
+     "f0_sigma_st": 0.20614784069181014,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0654911838790932
+    }
+   },
+   "recipe": "birdsong",
+   "seed": "realism-bench",
+   "sha256": "8096ed094defdb87d8fa93266e9f0817a21139497cb2445695e39b9fd3ca6046",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "sfx",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 4.0,
+    "lufs": -15.983521030677197,
+    "peak_dbfs": -4.855321884155273,
+    "realism": {
+     "event_count": 8,
+     "event_interval_cv": 1.2136614940840063,
+     "event_rate_hz": 2.0089285714285716,
+     "gain_line_share": 0.37271690771303473,
+     "gain_peak_hz": 0.5022321428571429,
+     "gain_peak_mean_ratio": 126.0846427748261,
+     "interaural": {
+      "b0_500": 0.9959821711888653,
+      "b2000_8000": 0.995746392570661,
+      "b500_2000": 0.9958525822242984,
+      "b8000_nyquist": 0.9957938523531469
+     }
+    },
+    "rms_dbfs": -25.303539276123047,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 354.62593872995126,
+     "f0_range_st": 5.212833889749298,
+     "f0_sigma_st": 1.7300592537990234,
+     "pause_count": 1,
+     "pause_rate_per_min": 15.0,
+     "pause_total_s": 1.04,
+     "voiced_fraction": 0.07556675062972293
+    }
+   },
+   "recipe": "birdsong",
+   "seed": "baseline-0.1.5",
+   "sha256": "548acf8b2c78e331264a427ddc3f94ff5cfe9696ff667cadd742006e8f747829",
+   "size_bytes": 1058468
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.035683372905204,
+    "peak_dbfs": -2.8501362800598145,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.33449635922330095,
+     "gain_line_share": 0.1547479221152695,
+     "gain_peak_hz": 0.33449635922330095,
+     "gain_peak_mean_ratio": 68.30583047772295,
+     "interaural": {
+      "b0_500": 0.9265721459577694,
+      "b2000_8000": 0.028352716225578816,
+      "b500_2000": 0.328280950501442,
+      "b8000_nyquist": 0.001125417412246244
+     }
+    },
+    "rms_dbfs": -20.651533126831055,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "storm",
+   "seed": "realism-bench",
+   "sha256": "4257714aa05499c2cbbdc42c10ecdd57d95a606f470655e348467d33b1378e09",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.070185026502443,
+    "peak_dbfs": -3.718893051147461,
+    "realism": {
+     "event_count": 2,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.33449635922330095,
+     "gain_line_share": 0.24176539806859892,
+     "gain_peak_hz": 0.33449635922330095,
+     "gain_peak_mean_ratio": 112.01157428943398,
+     "interaural": {
+      "b0_500": 0.9418085504813062,
+      "b2000_8000": 0.020526532726416528,
+      "b500_2000": 0.3370457782183582,
+      "b8000_nyquist": 0.001355317800621123
+     }
+    },
+    "rms_dbfs": -20.507030487060547,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 397.29729729729735,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 2.909054704327667e-14,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.03685092127303183
+    }
+   },
+   "recipe": "storm",
+   "seed": "baseline-0.1.5",
+   "sha256": "2e96a00a480d45137e2675a2d9ba36e170dc9988d1f4e2d760fc392a07387f1c",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.155288771563704,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 41,
+     "event_interval_cv": 0.5992194283784126,
+     "event_rate_hz": 6.85717536407767,
+     "gain_line_share": 0.22969955714251447,
+     "gain_peak_hz": 0.16724817961165048,
+     "gain_peak_mean_ratio": 112.09114374301079,
+     "interaural": {
+      "b0_500": 0.9058116576915741,
+      "b2000_8000": 0.06677259974485023,
+      "b500_2000": 0.28498296937319584,
+      "b8000_nyquist": 0.0032422642429725747
+     }
+    },
+    "rms_dbfs": -20.5645751953125,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "campfire",
+   "seed": "realism-bench",
+   "sha256": "0376ee29146638c4f64eb4515b3e82540f2dbeed42351a642e8cc816bd43cb68",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.2984865044808,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 41,
+     "event_interval_cv": 0.5020218856739636,
+     "event_rate_hz": 6.85717536407767,
+     "gain_line_share": 0.17197400995666684,
+     "gain_peak_hz": 2.843219053398058,
+     "gain_peak_mean_ratio": 60.47712321850419,
+     "interaural": {
+      "b0_500": 0.8727614685557086,
+      "b2000_8000": 0.02922687504476857,
+      "b500_2000": 0.2417036308764717,
+      "b8000_nyquist": 0.0025283766171176674
+     }
+    },
+    "rms_dbfs": -21.084230422973633,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "campfire",
+   "seed": "baseline-0.1.5",
+   "sha256": "32133ed03a58ae8071a4ce96b31ce31a953bfb207d92e5f716bbcde10b45579e",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.20048613141623,
+    "peak_dbfs": -4.023956298828125,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.27052686534696213,
+     "gain_peak_hz": 0.16724817961165048,
+     "gain_peak_mean_ratio": 120.33645960111704,
+     "interaural": {
+      "b0_500": 0.999176684978062,
+      "b2000_8000": 0.8022850633667992,
+      "b500_2000": 0.9779195392155848,
+      "b8000_nyquist": 0.9238573400416559
+     }
+    },
+    "rms_dbfs": -18.678213119506836,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ocean",
+   "seed": "realism-bench",
+   "sha256": "210e8948b8332b6116213a9ccc034babf2d9c77d21bff0630ec542628b4716ca",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.214825391404627,
+    "peak_dbfs": -3.017958402633667,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.13725241155877382,
+     "gain_peak_hz": 0.16724817961165048,
+     "gain_peak_mean_ratio": 60.25088124732649,
+     "interaural": {
+      "b0_500": 0.9991693532236131,
+      "b2000_8000": 0.7941248280253568,
+      "b500_2000": 0.9767702768260859,
+      "b8000_nyquist": 0.9191166427213422
+     }
+    },
+    "rms_dbfs": -18.570621490478516,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "ocean",
+   "seed": "baseline-0.1.5",
+   "sha256": "4e28c4ec1d62a43943fdd670cbb7e5937164e2185749f82bf260394d637dd49c",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.000070823220696,
+    "peak_dbfs": -5.112053871154785,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.15568114560086876,
+     "gain_peak_hz": 63.38706007281553,
+     "gain_peak_mean_ratio": 68.1141373864557,
+     "interaural": {
+      "b0_500": 0.9999999999999958,
+      "b2000_8000": 0.9999999999255117,
+      "b500_2000": 0.9999999999996252,
+      "b8000_nyquist": 0.9999999999311313
+     }
+    },
+    "rms_dbfs": -16.656545639038086,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 64.05215869881651,
+     "f0_range_st": 0.47365728947289887,
+     "f0_sigma_st": 0.10994328932859888,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.4036850921273032
+    }
+   },
+   "recipe": "spaceship",
+   "seed": "realism-bench",
+   "sha256": "481a5dab7aeda14f03b68a4f7265cfa3383272423d372a4acb460c40a17cd60f",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.010560584802867,
+    "peak_dbfs": -4.0402727127075195,
+    "realism": {
+     "event_count": 0,
+     "event_interval_cv": null,
+     "event_rate_hz": 0.0,
+     "gain_line_share": 0.16347027075568574,
+     "gain_peak_hz": 31.60990594660194,
+     "gain_peak_mean_ratio": 139.0186776196638,
+     "interaural": {
+      "b0_500": 0.999999999999998,
+      "b2000_8000": 0.9999999999582558,
+      "b500_2000": 0.9999999999995968,
+      "b8000_nyquist": 0.9999999999605493
+     }
+    },
+    "rms_dbfs": -15.968826293945312,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": 64.28571428571429,
+     "f0_range_st": 0.0,
+     "f0_sigma_st": 0.0,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.008375209380234505
+    }
+   },
+   "recipe": "spaceship",
+   "seed": "baseline-0.1.5",
+   "sha256": "56632b709852d7cf574ecc4cfb71485bbc46420a5827e027a8b020fa3328e4fb",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.158800225125052,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 10,
+     "event_interval_cv": 1.716587836539569,
+     "event_rate_hz": 1.6724817961165048,
+     "gain_line_share": 0.13088861964781834,
+     "gain_peak_hz": 0.5017445388349514,
+     "gain_peak_mean_ratio": 41.19380203014074,
+     "interaural": {
+      "b0_500": 0.9089819939091492,
+      "b2000_8000": 0.28801965731586787,
+      "b500_2000": 0.42022415196491403,
+      "b8000_nyquist": -0.0044548639837700054
+     }
+    },
+    "rms_dbfs": -21.154117584228516,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "meadow",
+   "seed": "realism-bench",
+   "sha256": "6ec16d4032fd606a92bf996a7090655f5efcbef35ea3d58e51cfb81c3d4c074d",
+   "size_bytes": 1587668
+  },
+  {
+   "kind": "ambient",
+   "mastered": true,
+   "metrics": {
+    "channels": 2,
+    "duration_s": 6.0,
+    "lufs": -16.262286896334807,
+    "peak_dbfs": -0.9999997019767761,
+    "realism": {
+     "event_count": 12,
+     "event_interval_cv": 2.436273966326913,
+     "event_rate_hz": 2.006978155339806,
+     "gain_line_share": 0.22465628523257344,
+     "gain_peak_hz": 0.16724817961165048,
+     "gain_peak_mean_ratio": 92.9559232251869,
+     "interaural": {
+      "b0_500": 0.911308044294689,
+      "b2000_8000": 0.43211475278239553,
+      "b500_2000": 0.427407259838763,
+      "b8000_nyquist": 0.004471622218727954
+     }
+    },
+    "rms_dbfs": -21.276363372802734,
+    "sample_rate": 44100,
+    "speech": {
+     "f0_mean_hz": null,
+     "f0_range_st": null,
+     "f0_sigma_st": null,
+     "pause_count": 0,
+     "pause_rate_per_min": 0.0,
+     "pause_total_s": -0.0,
+     "voiced_fraction": 0.0
+    }
+   },
+   "recipe": "meadow",
+   "seed": "baseline-0.1.5",
+   "sha256": "a71de68b89911cfbc3fe6d07d9b5aee54dacbc2b87032ef7cb8db7be04c136b9",
+   "size_bytes": 1587668
+  }
+ ],
+ "schema": "qinari-baseline/1"
+}

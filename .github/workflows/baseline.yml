@@ -1,0 +1,35 @@
+name: Baseline regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  baseline:
+    name: Compare catalog renders against the locked 0.1.5 baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the CLI
+        run: cargo build --release --bin qinari
+      - name: Render the fixed catalog (double capture, determinism-checked)
+        run: python3 benchmarks/baseline_render.py --qinari ./target/release/qinari --out /tmp/baseline-fresh.json
+      - name: Classify changes against the committed baseline (PLAN-0.2.0 §9)
+        run: >
+          python3 benchmarks/compare_baseline.py --fresh /tmp/baseline-fresh.json
+          --expected-change-file benchmarks/EXPECTED-CHANGE.md
+      - name: Upload the comparison on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-comparison
+          path: /tmp/baseline-fresh.comparison.txt
+          if-no-files-found: ignore

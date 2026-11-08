@@ -94,26 +94,36 @@ impl NoiseGen {
     /// realized power spectrum falls as `1/f^α` across the bank
     /// (α = 1 is pink, α = 2 brown; α = 0 degenerates to white).
     /// Output RMS is approximately [`SOFT_RMS`].
-    pub fn fractal(alpha: f32, rng: Qrng) -> Self {
-        const DESIGN_RATE: f32 = 44_100.0;
+    ///
+    /// Every stage is designed from its corner in hertz at
+    /// `sample_rate`, per call, so the realized spectrum is the same at
+    /// any sample rate (the bank list stops at a quarter of the actual
+    /// rate). At 44.1 kHz the design is bit-identical to the historical
+    /// fixed-44.1 kHz one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `sample_rate` is not positive (the same contract as
+    /// [`crate::karplus::pluck`]).
+    pub fn fractal(alpha: f32, sample_rate: f32, rng: Qrng) -> Self {
         const TOP_HZ: f32 = 11_000.0;
+        assert!(sample_rate > 0.0, "sample_rate must be positive");
         let alpha = alpha.clamp(0.0, 2.0);
         if alpha <= 0.02 {
             return Self::new(NoiseKind::White, rng);
         }
-        // The bank cannot know the caller's sample rate, so the stages
-        // are designed at a 44.1 kHz reference and the list is cut once a
-        // corner would pass a quarter of that rate. At other rates the
-        // effective corners shift proportionally (a one-pole keeps its
-        // per-sample coefficient), which only rescales the octaves — the
-        // per-octave slope is untouched.
-        let top_hz = TOP_HZ;
+        // The variance bookkeeping below uses the raw corner; the list
+        // cut at sample_rate/4 keeps every corner at or below it, so
+        // the Nyquist guard inside OnePole (which clamps just under
+        // sr/4) can only ever touch a corner sitting within 0.1% of the
+        // cut, shifting the normalization by less than 1e-6.
+        let top_hz = TOP_HZ.min(sample_rate / 4.0);
         let mut poles = Vec::new();
         let mut scales = Vec::new();
         let mut corner = FRACTAL_BOTTOM_HZ;
         let mut total_variance = 0.0f32;
         while corner <= top_hz {
-            let a = (-2.0 * std::f32::consts::PI * corner / DESIGN_RATE).exp();
+            let a = (-2.0 * std::f32::consts::PI * corner / sample_rate).exp();
             let gain = one_pole_variance_gain(a);
             // Stage weight only: the per-stage spectra must keep their
             // natural slope (normalizing each stage to unit variance
@@ -124,7 +134,7 @@ impl NoiseGen {
             // Uniform [-1, 1) draws carry variance 1/3.
             total_variance += weight * weight * gain / 3.0;
             scales.push(weight);
-            poles.push(crate::filter::OnePole::new(DESIGN_RATE, corner));
+            poles.push(crate::filter::OnePole::new(sample_rate, corner));
             corner *= 2.0;
         }
         let output_scale = SOFT_RMS / total_variance.sqrt();
@@ -510,7 +520,7 @@ mod tests {
 
     /// Octave-band power of a generator over `secs` seconds.
     fn band_power(alpha: f32, freq: f32, secs: f32, seed: u64) -> f64 {
-        let mut gen = NoiseGen::fractal(alpha, Qrng::new(seed));
+        let mut gen = NoiseGen::fractal(alpha, SR, Qrng::new(seed));
         let blocks = 16;
         let block_len = (secs * SR / blocks as f32) as usize;
         let mut total = 0.0f64;
@@ -519,6 +529,135 @@ mod tests {
             total += f64::from(goertzel_power(&block, freq, SR));
         }
         total
+    }
+
+    /// Measures a one-pole's half-power (corner) frequency at `sr` by
+    /// bisecting its steady-state sine response: the DC gain is 1, so
+    /// the corner sits where the response crosses 1/sqrt(2). The drive
+    /// spans an integer number of periods and the amplitude is the
+    /// settled half's peak, so the measurement carries no spectral-
+    /// leakage bias.
+    fn measured_corner_hz(pole: &crate::filter::OnePole, sr: f32) -> f32 {
+        let mut probe = *pole;
+        let mut amplitude = |freq: f32| {
+            let n = (40.0 * sr / freq) as usize;
+            let settle = n / 2;
+            let mut peak = 0.0f32;
+            for i in 0..n {
+                let x = (2.0 * std::f32::consts::PI * freq * i as f32 / sr).sin();
+                let y = probe.process(x);
+                if i >= settle {
+                    peak = peak.max(y.abs());
+                }
+            }
+            peak
+        };
+        let target = std::f32::consts::FRAC_1_SQRT_2;
+        let mut lo = 1.0f32; // response above target
+        let mut hi = 200.0f32; // response below target
+        for _ in 0..30 {
+            let mid = f32::midpoint(lo, hi);
+            if amplitude(mid) > target {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        f32::midpoint(lo, hi)
+    }
+
+    #[test]
+    fn fractal_bottom_corner_is_20_hz_at_every_sample_rate() {
+        // F5 regression: the bank used to design its stages at a fixed
+        // 44.1 kHz, so the 20 Hz bottom corner measured 21.77 Hz at
+        // 48 kHz (+8.8%) and 43.54 Hz at 96 kHz (+118%). Designing from
+        // the corner in hertz at the actual rate pins it at 20 Hz.
+        for sr in [44_100.0f32, 48_000.0, 96_000.0] {
+            let gen = NoiseGen::fractal(2.0, sr, Qrng::new(7));
+            let Flavor::Fractal { poles, .. } = &gen.flavor else {
+                panic!("fractal flavor");
+            };
+            let corner = measured_corner_hz(&poles[0], sr);
+            assert!(
+                (corner - FRACTAL_BOTTOM_HZ).abs() / FRACTAL_BOTTOM_HZ <= 0.02,
+                "sr {sr}: bottom corner {corner:.2} Hz, want 20 Hz ±2%"
+            );
+        }
+    }
+
+    /// Deterministic ensemble power spectrum of a fractal bank at
+    /// `freq`, in power per hertz: the stages are driven by independent
+    /// streams, so the expected per-bin power is the weighted sum of
+    /// the per-stage transfer magnitudes, and dividing by `sr` converts
+    /// per-bin (normalized-frequency) power to the rate-invariant
+    /// per-hertz density — the same band must hold the same power at
+    /// every sample rate. No RNG variance; exact across runs.
+    fn bank_power_spectrum(gen: &NoiseGen, freq: f32, sr: f32) -> f64 {
+        let Flavor::Fractal {
+            poles,
+            scales,
+            output_scale,
+        } = &gen.flavor
+        else {
+            panic!("fractal flavor");
+        };
+        let mut total = 0.0f64;
+        for (pole, &scale) in poles.iter().zip(scales.iter()) {
+            let mut probe = *pole;
+            let n = (40.0 * sr / freq) as usize;
+            let settle = n / 2;
+            let mut peak = 0.0f32;
+            for i in 0..n {
+                let x = (2.0 * std::f32::consts::PI * freq * i as f32 / sr).sin();
+                let y = probe.process(x);
+                if i >= settle {
+                    peak = peak.max(y.abs());
+                }
+            }
+            let stage = f64::from(scale * output_scale * peak);
+            total += stage * stage;
+        }
+        total / f64::from(sr)
+    }
+
+    #[test]
+    fn fractal_spectrum_is_invariant_across_sample_rates() {
+        // F5 acceptance: the realized spectrum over 20–10240 Hz holds
+        // within 0.5 dB between the supported rates (44.1↔48 kHz, the
+        // invariance contract of docs/PLAN-0.2.0.md §10.E). At 96 kHz
+        // the bound is 1.0 dB: the 44.1 kHz reference is itself warped
+        // by its Nyquist proximity at the window top (its "10240 Hz"
+        // stage realizes half-power near 12.9 kHz), and a one-pole bank
+        // at 2.2x the rate cannot reproduce that warp — measured
+        // residual 0.76 dB worst case (α 0.5, window top), against
+        // 2.2–2.7 dB for the old fixed-44.1 kHz design. 96 kHz support
+        // is pending decision D6; the corner test above still pins its
+        // design. Measurement: deterministic ensemble power density
+        // (see `bank_power_spectrum`) on a third-octave grid, 44.1 kHz
+        // as the reference.
+        let bounds = [(48_000.0f32, 0.5f64), (96_000.0, 1.0)];
+        for alpha in [0.5f32, 1.0, 2.0] {
+            let reference: Vec<f64> = (0..=27)
+                .map(|step| {
+                    let freq = 20.0 * 2.0_f32.powf(step as f32 / 3.0);
+                    let gen = NoiseGen::fractal(alpha, 44_100.0, Qrng::new(7));
+                    bank_power_spectrum(&gen, freq, 44_100.0)
+                })
+                .collect();
+            for (rate, bound_db) in bounds {
+                let gen = NoiseGen::fractal(alpha, rate, Qrng::new(7));
+                for (step, base) in reference.iter().enumerate() {
+                    let freq = 20.0 * 2.0_f32.powf(step as f32 / 3.0);
+                    let deviation_db =
+                        10.0 * (bank_power_spectrum(&gen, freq, rate) / base).log10();
+                    assert!(
+                        deviation_db.abs() <= bound_db,
+                        "alpha {alpha}, sr {rate}, {freq:.0} Hz: \
+                         {deviation_db:.3} dB from 44.1 kHz (bound {bound_db} dB)"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
@@ -554,7 +693,7 @@ mod tests {
 
     #[test]
     fn fractal_noise_is_finite_at_sane_rms() {
-        let mut gen = NoiseGen::fractal(1.3, Qrng::new(52));
+        let mut gen = NoiseGen::fractal(1.3, SR, Qrng::new(52));
         let samples: Vec<f32> = (0..96_000).map(|_| gen.process()).collect();
         assert!(samples.iter().all(|s| s.is_finite()));
         let rms =

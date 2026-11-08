@@ -477,7 +477,7 @@ fn thunder_rumble(ctx: &RenderContext, sr: f32, distance: f32) -> Vec<f32> {
     let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
     let onset_tau = 0.12 + 0.5 * distance;
     let tail = bed_latent_tilted("thunder", ctx, 0.3, 0.45);
-    let mut source = NoiseGen::fractal(2.0, tagged_rng("thunder", "rumble", ctx));
+    let mut source = NoiseGen::fractal(2.0, sr, tagged_rng("thunder", "rumble", ctx));
     let mut lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
     let mut highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
     let mut decay_shape = Percussive::from_t60(sr, rumble_t60);
@@ -1212,7 +1212,7 @@ fn render_explosion(ctx: &RenderContext) -> Result<AudioBuffer, String> {
     let rumble_t60 = 1.0 + 1.8 * size + 0.8 * distance;
     let rumble_frames = (1.2 * rumble_t60 * sr) as usize;
     let tail = bed_latent_tilted("explosion", ctx, 0.25, 0.45);
-    let mut blast_source = NoiseGen::fractal(2.0, tagged_rng("explosion", "rumble", ctx));
+    let mut blast_source = NoiseGen::fractal(2.0, sr, tagged_rng("explosion", "rumble", ctx));
     let mut blast_lowpass = Biquad::design(BiquadKind::Lowpass, sr, 300.0, BUTTERWORTH, 0.0);
     let mut blast_highpass = Biquad::design(BiquadKind::Highpass, sr, 30.0, BUTTERWORTH, 0.0);
     let mut blast_shape = Percussive::shaped(sr, 0.02, rumble_t60 / 6.91, rumble_t60 / 3.0, 0.35);

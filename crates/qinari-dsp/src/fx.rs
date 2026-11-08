@@ -126,7 +126,8 @@ impl Allpass {
 ///
 /// Per channel: 8 parallel combs (base tunings 1116, 1188, 1277, 1356,
 /// 1422, 1491, 1557, 1617 scaled by `sr / 44100`, feedback 0.84, damping
-/// 0.2) feeding 4 serial allpasses (556, 441, 341, 225 scaled, gain 0.5).
+/// 0.2 held at its 44.1 kHz corner) feeding 4 serial allpasses
+/// (556, 441, 341, 225 scaled, gain 0.5).
 /// The right channel's tunings are offset by a 23-sample spread. Input is
 /// scaled by Freeverb's fixed 0.015 gain and the output is dry + wet.
 #[derive(Debug, Clone)]
@@ -135,6 +136,7 @@ pub struct Freeverb {
     combs_r: Vec<Comb>,
     allpasses_l: Vec<Allpass>,
     allpasses_r: Vec<Allpass>,
+    damp: f32,
 }
 
 const COMB_TUNINGS: [f32; 8] = [
@@ -142,6 +144,14 @@ const COMB_TUNINGS: [f32; 8] = [
 ];
 const ALLPASS_TUNINGS: [f32; 4] = [556.0, 441.0, 341.0, 225.0];
 const STEREO_SPREAD: f32 = 23.0;
+
+/// Comb loop gain, applied once per recirculation. The delay lines scale
+/// with the sample rate, so this is rate-invariant as-is.
+const FEEDBACK: f32 = 0.84;
+/// Per-sample comb damping weight at the 44.1 kHz anchor: the damping
+/// one-pole's pole is `1 - DAMP` (a ~1.6 kHz corner at 44.1 kHz). See
+/// [`Freeverb::new`] for how the corner is held at other rates.
+const DAMP: f32 = 0.2;
 
 impl Freeverb {
     /// Creates the reverb for `sample_rate`.
@@ -160,27 +170,32 @@ impl Freeverb {
             allpasses_l.push(Allpass::new(scaled(tuning)));
             allpasses_r.push(Allpass::new(scaled(tuning + STEREO_SPREAD)));
         }
+        // The comb damping is a one-pole: a fixed per-sample pole `1 -
+        // DAMP` would drift its ~1.6 kHz corner +8.8% at 48 kHz and
+        // +118% at 96 kHz (the F5 family). Anchor the corner in hertz
+        // instead: the per-sample pole becomes `(1 - DAMP)^(44100/sr)`.
+        // At 44.1 kHz this is the historical DAMP to within 1 ulp.
+        let damp = 1.0 - (1.0 - DAMP).powf(44_100.0 / sample_rate);
         Self {
             combs_l,
             combs_r,
             allpasses_l,
             allpasses_r,
+            damp,
         }
     }
 
     /// Processes one stereo frame, returning `(dry + wet_l, dry + wet_r)`.
     pub fn process(&mut self, left_in: f32, right_in: f32) -> (f32, f32) {
         const FIXED_GAIN: f32 = 0.015;
-        const FEEDBACK: f32 = 0.84;
-        const DAMP: f32 = 0.2;
         let input = left_in.midpoint(right_in) * FIXED_GAIN;
         let mut wet_l = 0.0;
         let mut wet_r = 0.0;
         for comb in &mut self.combs_l {
-            wet_l += comb.process(input, FEEDBACK, DAMP);
+            wet_l += comb.process(input, FEEDBACK, self.damp);
         }
         for comb in &mut self.combs_r {
-            wet_r += comb.process(input, FEEDBACK, DAMP);
+            wet_r += comb.process(input, FEEDBACK, self.damp);
         }
         for allpass in &mut self.allpasses_l {
             wet_l = allpass.process(wet_l);
@@ -729,5 +744,96 @@ mod tests {
         let mut tremolo = Tremolo::new(5.0, 0.0, SR, &mut Qrng::new(15));
         let bypassed: Vec<f32> = (0..100).map(|_| tremolo.process(0.7)).collect();
         assert!(bypassed.iter().all(|&s| (s - 0.7).abs() < 1e-6));
+    }
+
+    /// F5-family regression: the Freeverb comb damping one-pole is
+    /// anchored at its 44.1 kHz corner, so the closed-loop response it
+    /// shapes holds across sample rates. Before the anchor the measured
+    /// tooth-envelope corner read 306.9 Hz at 44.1 kHz, 330.2 Hz at
+    /// 48 kHz (+7.6%), and 629.8 Hz at 96 kHz (+105%). After the anchor
+    /// it reads 306.9 / 304.7 (-0.7%) / 293.0 Hz (-4.5%); the residual
+    /// at 96 kHz is the warp of the 44.1 kHz reference itself, amplified
+    /// by the loop sensitivity (see the bounds at the assertion).
+    ///
+    /// Measurement: a comb on the 1116 tuning scaled 8x (teeth every
+    /// ~4.9 Hz, so the 3 dB crossing carries no grid-phase error),
+    /// settled for 64 rings (0.84^64 = 1.5e-5), with the damping taken
+    /// from the production [`Freeverb::new`] at that rate. The 3 dB crossing
+    /// is the quadratic root inside the bracketing tooth pair.
+    #[test]
+    fn freeverb_damping_corner_is_invariant_across_sample_rates() {
+        let tooth_gain = |sr: f32, damp: f32, k: usize| -> f32 {
+            let size = (((1116.0 * 8.0) * sr / 44_100.0).round() as usize).max(1);
+            let freq = k as f32 * sr / size as f32;
+            let mut comb = Comb::new(size);
+            let settle = 64 * size;
+            let n = settle + ((3.0 * sr / freq) as usize).max(240);
+            let mut peak = 0.0f32;
+            for i in 0..n {
+                let x = (2.0 * std::f32::consts::PI * freq * i as f32 / sr).sin();
+                let y = comb.process(x, FEEDBACK, damp);
+                if i >= settle {
+                    peak = peak.max(y.abs());
+                }
+            }
+            peak
+        };
+        let mut corners = Vec::new();
+        for sr in [44_100.0f32, 48_000.0, 96_000.0] {
+            let damp = Freeverb::new(sr).damp;
+            // Reference: the (rate-invariant) low-frequency tooth gain
+            // (~79 Hz); the corner is where the envelope falls 3 dB
+            // below it.
+            let reference = tooth_gain(sr, damp, 16);
+            let target = reference / std::f32::consts::SQRT_2;
+            let mut lo = 16usize;
+            let mut hi = 600usize;
+            for _ in 0..16 {
+                let mid = usize::midpoint(lo, hi);
+                if tooth_gain(sr, damp, mid) > target {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            // Quadratic root inside the bracketing tooth pair: the gain
+            // curve is convex, so a chord biases the crossing low by up
+            // to a tooth spacing.
+            let g1 = tooth_gain(sr, damp, lo - 1);
+            let g2 = tooth_gain(sr, damp, lo);
+            let g3 = tooth_gain(sr, damp, lo + 1);
+            let d2 = g1 - 2.0 * g2 + g3;
+            let b = 0.5 * (g3 - g1);
+            let c = g2 - target;
+            let disc = (b * b - 2.0 * d2 * c).max(0.0);
+            let y = if d2.abs() < 1e-9 {
+                c / (-b)
+            } else {
+                2.0 * c / (-b + disc.sqrt())
+            };
+            let size = (((1116.0 * 8.0) * sr / 44_100.0).round() as usize).max(1);
+            let corner = (lo as f32 + y.clamp(0.0, 1.0)) * sr / size as f32;
+            corners.push((sr, corner));
+        }
+        let base = corners[0].1;
+        assert!(
+            (base - 307.0).abs() / 307.0 <= 0.05,
+            "44.1 kHz damping corner {base:.1} Hz drifted from the anchored ~307 Hz"
+        );
+        // 44.1↔48 kHz is the invariance contract of record (PLAN-0.2.0
+        // §12: 96 kHz support awaits decision D6). The 96 kHz bound is
+        // wider on purpose: the envelope corner carries ~1/(1 -
+        // feedback)² ≈ 39x sensitivity to the damping response, which
+        // amplifies the one-pole discretization warp of the 44.1 kHz
+        // reference itself into a measured -4.5% (293.0 Hz) — against
+        // +105% (629.8 Hz) before the anchor.
+        for ((sr, corner), bound) in corners.into_iter().zip([0.02f32, 0.02, 0.06]) {
+            assert!(
+                (corner - base).abs() / base <= bound,
+                "sr {sr}: damping corner {corner:.1} Hz, want {base:.1} Hz \
+                 ±{:.0}% (the 44.1 kHz value)",
+                bound * 100.0
+            );
+        }
     }
 }
